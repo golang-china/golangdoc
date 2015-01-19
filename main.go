@@ -46,11 +46,11 @@ import (
 
 	"github.com/chai2010/golangdoc/godoc"
 	"github.com/chai2010/golangdoc/godoc/analysis"
-	"github.com/chai2010/golangdoc/godoc/static"
 	"github.com/chai2010/golangdoc/godoc/vfs"
 	"github.com/chai2010/golangdoc/godoc/vfs/gatefs"
 	"github.com/chai2010/golangdoc/godoc/vfs/mapfs"
 	"github.com/chai2010/golangdoc/godoc/vfs/zipfs"
+	"github.com/chai2010/golangdoc/local/static"
 )
 
 const (
@@ -102,6 +102,9 @@ var (
 
 	// source code notes
 	notesRx = flag.String("notes", "BUG", "regular expression matching note markers to show")
+
+	// local language
+	lang = flag.String("lang", "zh_CN", "local language")
 )
 
 func usage() {
@@ -186,7 +189,7 @@ func main() {
 	if *templateDir != "" {
 		fs.Bind("/lib/godoc", vfs.OS(*templateDir), "/", vfs.BindBefore)
 	} else {
-		fs.Bind("/lib/godoc", mapfs.New(static.Files), "/", vfs.BindReplace)
+		fs.Bind("/lib/godoc", mapfs.New(static.Files(*lang)), "/", vfs.BindReplace)
 	}
 
 	// Bind $GOPATH trees into Go root.

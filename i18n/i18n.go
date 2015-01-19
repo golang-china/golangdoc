@@ -11,7 +11,7 @@ package i18n
 import (
 	"go/doc"
 
-	"golang.org/x/tools/godoc/static"
+	"github.com/chai2010/golangdoc/godoc/static"
 )
 
 type local struct {
