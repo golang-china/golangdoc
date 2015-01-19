@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-var godocTests = []struct {
+var golangdocTests = []struct {
 	args      []string
 	matches   []string // regular expressions
 	dontmatch []string // regular expressions
@@ -64,13 +64,13 @@ var godocTests = []struct {
 	},
 }
 
-// buildGodoc builds the godoc executable.
+// buildGodoc builds the golangdoc executable.
 // It returns its path, and a cleanup function.
 //
 // TODO(adonovan): opt: do this at most once, and do the cleanup
 // exactly once.  How though?  There's no atexit.
 func buildGodoc(t *testing.T) (bin string, cleanup func()) {
-	tmp, err := ioutil.TempDir("", "godoc-regtest-")
+	tmp, err := ioutil.TempDir("", "golangdoc-regtest-")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,25 +80,25 @@ func buildGodoc(t *testing.T) (bin string, cleanup func()) {
 		}
 	}()
 
-	bin = filepath.Join(tmp, "godoc")
+	bin = filepath.Join(tmp, "golangdoc")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
 	cmd := exec.Command("go", "build", "-o", bin)
 	if err := cmd.Run(); err != nil {
-		t.Fatalf("Building godoc: %v", err)
+		t.Fatalf("Building golangdoc: %v", err)
 	}
 
 	return bin, func() { os.RemoveAll(tmp) }
 }
 
-// Basic regression test for godoc command-line tool.
+// Basic regression test for golangdoc command-line tool.
 func TestCLI(t *testing.T) {
 	bin, cleanup := buildGodoc(t)
 	defer cleanup()
-	for _, test := range godocTests {
+	for _, test := range golangdocTests {
 		cmd := exec.Command(bin, test.args...)
-		cmd.Args[0] = "godoc"
+		cmd.Args[0] = "golangdoc"
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			t.Errorf("Running with args %#v: %v", test.args, err)
@@ -107,13 +107,13 @@ func TestCLI(t *testing.T) {
 		for _, pat := range test.matches {
 			re := regexp.MustCompile(pat)
 			if !re.Match(out) {
-				t.Errorf("godoc %v =\n%s\nwanted /%v/", strings.Join(test.args, " "), out, pat)
+				t.Errorf("golangdoc %v =\n%s\nwanted /%v/", strings.Join(test.args, " "), out, pat)
 			}
 		}
 		for _, pat := range test.dontmatch {
 			re := regexp.MustCompile(pat)
 			if re.Match(out) {
-				t.Errorf("godoc %v =\n%s\ndid not want /%v/", strings.Join(test.args, " "), out, pat)
+				t.Errorf("golangdoc %v =\n%s\ndid not want /%v/", strings.Join(test.args, " "), out, pat)
 			}
 		}
 	}
@@ -150,7 +150,7 @@ func killAndWait(cmd *exec.Cmd) {
 	cmd.Wait()
 }
 
-// Basic integration test for godoc HTTP interface.
+// Basic integration test for golangdoc HTTP interface.
 func TestWeb(t *testing.T) {
 	bin, cleanup := buildGodoc(t)
 	defer cleanup()
@@ -158,9 +158,9 @@ func TestWeb(t *testing.T) {
 	cmd := exec.Command(bin, fmt.Sprintf("-http=%s", addr))
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	cmd.Args[0] = "godoc"
+	cmd.Args[0] = "golangdoc"
 	if err := cmd.Start(); err != nil {
-		t.Fatalf("failed to start godoc: %s", err)
+		t.Fatalf("failed to start golangdoc: %s", err)
 	}
 	defer killAndWait(cmd)
 	waitForServer(t, addr)
@@ -239,10 +239,10 @@ func TestWeb(t *testing.T) {
 	}
 }
 
-// Basic integration test for godoc -analysis=type (via HTTP interface).
+// Basic integration test for golangdoc -analysis=type (via HTTP interface).
 func TestTypeAnalysis(t *testing.T) {
 	// Write a fake GOROOT/GOPATH.
-	tmpdir, err := ioutil.TempDir("", "godoc-analysis")
+	tmpdir, err := ioutil.TempDir("", "golangdoc-analysis")
 	if err != nil {
 		t.Fatalf("ioutil.TempDir failed: %s", err)
 	}
@@ -288,9 +288,9 @@ func main() { print(lib.V) }
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd.Args[0] = "godoc"
+	cmd.Args[0] = "golangdoc"
 	if err := cmd.Start(); err != nil {
-		t.Fatalf("failed to start godoc: %s", err)
+		t.Fatalf("failed to start golangdoc: %s", err)
 	}
 	defer killAndWait(cmd)
 	waitForServer(t, addr)
@@ -340,7 +340,7 @@ tryagain:
 
 		if !bytes.Contains(body, []byte("Static analysis features")) {
 			// Type analysis results usually become available within
-			// ~4ms after godoc startup (for this input on my machine).
+			// ~4ms after golangdoc startup (for this input on my machine).
 			if elapsed := time.Since(t0); elapsed > 500*time.Millisecond {
 				t.Fatalf("type analysis results still unavailable after %s", elapsed)
 			}
