@@ -50,7 +50,8 @@ import (
 	"github.com/chai2010/golangdoc/godoc/vfs/gatefs"
 	"github.com/chai2010/golangdoc/godoc/vfs/mapfs"
 	"github.com/chai2010/golangdoc/godoc/vfs/zipfs"
-	"github.com/chai2010/golangdoc/local/static"
+	"github.com/chai2010/golangdoc/i18n"
+	_ "github.com/chai2010/golangdoc/local/static"
 )
 
 const (
@@ -189,7 +190,7 @@ func main() {
 	if *templateDir != "" {
 		fs.Bind("/lib/godoc", vfs.OS(*templateDir), "/", vfs.BindBefore)
 	} else {
-		fs.Bind("/lib/godoc", mapfs.New(static.Files(*lang)), "/", vfs.BindReplace)
+		fs.Bind("/lib/godoc", mapfs.New(i18n.StaticFiles(*lang)), "/", vfs.BindReplace)
 	}
 
 	// Bind $GOPATH trees into Go root.

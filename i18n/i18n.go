@@ -14,48 +14,35 @@ import (
 	"github.com/chai2010/golangdoc/godoc/static"
 )
 
-type local struct {
-	lang             string
-	localDocPackage  func(p *doc.Package) *doc.Package
-	localStaticFiles func() map[string]string
+var (
+	localStaticFilesTable = map[string]map[string]string{}
+	localDocPackageTable  = map[string]func(p *doc.Package) *doc.Package{}
+)
+
+func RegisterStaticFiles(lang string, localStaticFiles map[string]string) {
+	localStaticFilesTable[lang] = localStaticFiles
 }
 
-var locals []local
-
-func Register(lang string,
-	localDocPackage func(p *doc.Package) *doc.Package,
-	localStaticFiles func() map[string]string,
-) {
-	locals = append(locals, local{
-		lang:             lang,
-		localDocPackage:  localDocPackage,
-		localStaticFiles: localStaticFiles,
-	})
-}
-
-func sniff(lang string) local {
-	for _, f := range locals {
-		if f.lang == lang {
-			return f
-		}
-	}
-	return local{}
-}
-
-func DocPackage(p *doc.Package, lang ...string) *doc.Package {
-	if len(lang) > 0 {
-		if f := sniff(lang[0]); f.localDocPackage != nil {
-			return f.localDocPackage(p)
-		}
-	}
-	return p
+func RegisterDocPackage(lang string, localDocPackage func(p *doc.Package) *doc.Package) {
+	localDocPackageTable[lang] = localDocPackage
 }
 
 func StaticFiles(lang ...string) map[string]string {
 	if len(lang) > 0 {
-		if f := sniff(lang[0]); f.localStaticFiles != nil {
-			return f.localStaticFiles()
+		if f, ok := localStaticFilesTable[lang[0]]; ok && f != nil {
+			return f
 		}
 	}
 	return static.Files
+}
+
+func DocPackage(p *doc.Package, lang ...string) *doc.Package {
+	if len(lang) > 0 {
+		if f, ok := localDocPackageTable[lang[0]]; ok && f != nil {
+			if x := f(p); x != nil {
+				return x
+			}
+		}
+	}
+	return p
 }

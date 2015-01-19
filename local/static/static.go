@@ -6,6 +6,7 @@ package static
 
 import (
 	"github.com/chai2010/golangdoc/godoc/static"
+	"github.com/chai2010/golangdoc/i18n"
 )
 
 func Files(lang ...string) map[string]string {
@@ -15,4 +16,10 @@ func Files(lang ...string) map[string]string {
 		}
 	}
 	return static.Files
+}
+
+func init() {
+	for lang, files := range StaticFilesTable {
+		i18n.RegisterStaticFiles(lang, files)
+	}
 }
