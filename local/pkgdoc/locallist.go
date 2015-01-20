@@ -12,10 +12,14 @@ import (
 	unsafe_zh_CN "github.com/chai2010/golangdoc/local/pkgdoc/zh_CN/unsafe"
 )
 
-var OriginDocPackages = []*doc.Package{
-	unsafe_zh_CN.OriginDocPackage,
+var OriginDocPackageTable = map[string][]*doc.Package{
+	"zh_CN": []*doc.Package{
+		unsafe_zh_CN.OriginDocPackage,
+	},
 }
 
-var TranslateDocPackages = []*doc.Package{
-	unsafe_zh_CN.TranslateDocPackage,
+var TranslateDocPackageTable = map[string][]*doc.Package{
+	"zh_CN": []*doc.Package{
+		unsafe_zh_CN.TranslateDocPackage,
+	},
 }
