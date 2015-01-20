@@ -9,8 +9,10 @@ import (
 )
 
 var (
-	OriginPackage    *doc.Package = ToDocPackage(originPackage)
-	TranslatePackage *doc.Package = ToDocPackage(translatePackage)
+	OriginPackage       *Package     = originPackage
+	TranslatePackage    *Package     = translatePackage
+	OriginDocPackage    *doc.Package = ToDocPackage(originPackage)
+	TranslateDocPackage *doc.Package = ToDocPackage(translatePackage)
 )
 
 type Package struct {
