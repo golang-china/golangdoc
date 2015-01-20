@@ -6,6 +6,7 @@ package unsafe_zh_CN
 
 import (
 	"go/doc"
+	"strings"
 )
 
 var (
@@ -66,7 +67,7 @@ func ToDocPackage(p *Package) *doc.Package {
 	return &doc.Package{
 		Name:       p.Name,
 		ImportPath: p.ImportPath,
-		Doc:        p.Doc,
+		Doc:        GoodDoc(p.Doc),
 		Notes:      p.makeNotes(),
 		Consts:     p.makeConsts(),
 		Types:      p.makeTypes(),
@@ -111,7 +112,7 @@ func (p *Package) makeConsts() []*doc.Value {
 	for i := 0; i < len(consts); i++ {
 		consts[i] = &doc.Value{
 			Names: append([]string(nil), p.Consts[i].Names...),
-			Doc:   p.Consts[i].Doc,
+			Doc:   GoodDoc(p.Consts[i].Doc),
 		}
 	}
 	return consts
@@ -137,7 +138,7 @@ func (p *Package) makeTypes() []*doc.Type {
 	for i := 0; i < len(types); i++ {
 		types[i] = &doc.Type{
 			Name: p.Types[i].Name,
-			Doc:  p.Types[i].Doc,
+			Doc:  GoodDoc(p.Types[i].Doc),
 
 			Consts:  p.makeTypeConsts(p.Types[i].Name),
 			Vars:    p.makeTypeVars(p.Types[i].Name),
@@ -162,7 +163,7 @@ func (p *Package) makeFuncs() []*doc.Func {
 	for i := 0; i < len(funcs); i++ {
 		funcs[i] = &doc.Func{
 			Name: p.Funcs[i].Name,
-			Doc:  p.Funcs[i].Doc,
+			Doc:  GoodDoc(p.Funcs[i].Doc),
 		}
 	}
 	return funcs
@@ -174,7 +175,7 @@ func (p *Package) makeTypeConsts(typeName string) []*doc.Value {
 		if p.Consts[i].Type == typeName {
 			consts = append(consts, &doc.Value{
 				Names: append([]string(nil), p.Consts[i].Names...),
-				Doc:   p.Consts[i].Doc,
+				Doc:   GoodDoc(p.Consts[i].Doc),
 			})
 		}
 	}
@@ -187,7 +188,7 @@ func (p *Package) makeTypeVars(typeName string) []*doc.Value {
 		if p.Vars[i].Type == typeName {
 			vars = append(vars, &doc.Value{
 				Names: append([]string(nil), p.Vars[i].Names...),
-				Doc:   p.Vars[i].Doc,
+				Doc:   GoodDoc(p.Vars[i].Doc),
 			})
 		}
 	}
@@ -200,7 +201,7 @@ func (p *Package) makeTypeFuncs(typeName string) []*doc.Func {
 		if p.Funcs[i].Type == typeName {
 			funcs = append(funcs, &doc.Func{
 				Name: p.Funcs[i].Name,
-				Doc:  p.Funcs[i].Doc,
+				Doc:  GoodDoc(p.Funcs[i].Doc),
 			})
 		}
 	}
@@ -222,7 +223,7 @@ func (p *Package) makeTypeMethods(typeName string) []*doc.Func {
 		if p.Methods[i].Type == typeName {
 			methods = append(methods, &doc.Func{
 				Name: p.Methods[i].Name,
-				Doc:  p.Methods[i].Doc,
+				Doc:  GoodDoc(p.Methods[i].Doc),
 			})
 		}
 	}
@@ -243,8 +244,22 @@ func (p *Package) makeVars() []*doc.Value {
 	for i := 0; i < len(vars); i++ {
 		vars[i] = &doc.Value{
 			Names: append([]string(nil), p.Vars[i].Names...),
-			Doc:   p.Vars[i].Doc,
+			Doc:   GoodDoc(p.Vars[i].Doc),
 		}
 	}
 	return vars
+}
+
+func GoodDoc(doc string) string {
+	lines := strings.Split(doc, "\n")
+	for i := 0; i < len(lines); i++ {
+		if strings.HasPrefix(lines[i], "// ") {
+			lines[i] = strings.TrimPrefix(lines[i], "// ")
+		}
+		if strings.HasPrefix(lines[i], "//\t") {
+			lines[i] = strings.TrimPrefix(lines[i], "//")
+		}
+	}
+	doc = strings.Join(lines, "\n")
+	return doc
 }

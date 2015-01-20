@@ -6,6 +6,7 @@ package godoc
 
 import (
 	"errors"
+	"go/doc"
 	pathpkg "path"
 	"time"
 
@@ -78,6 +79,10 @@ type Corpus struct {
 	// If showList is false, the package is hidden from the
 	// package listing.
 	SummarizePackage func(pkg string) (summary string, showList, ok bool)
+
+	// TranslateDocPackage optionally specifies a function to
+	// translate the package document.
+	TranslateDocPackage func(pkg *doc.Package) *doc.Package
 
 	// IndexDirectory optionally specifies a function to determine
 	// whether the provided directory should be indexed.  The dir

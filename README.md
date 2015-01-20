@@ -1,8 +1,10 @@
 # Godoc for Golang, try support translate.
 
-In working ...
+Start Chinese Godoc:
 
-See
+	golangdoc -http=:6060 -lang=zh_CN
+
+See:
 
 - http://godoc.org/github.com/chai2010/golangdoc/i18n
 - http://godoc.org/github.com/chai2010/golangdoc/local/static

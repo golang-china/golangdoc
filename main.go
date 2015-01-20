@@ -33,6 +33,7 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
+	"go/doc"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -51,6 +52,8 @@ import (
 	"github.com/chai2010/golangdoc/godoc/vfs/mapfs"
 	"github.com/chai2010/golangdoc/godoc/vfs/zipfs"
 	"github.com/chai2010/golangdoc/i18n"
+
+	_ "github.com/chai2010/golangdoc/local/pkgdoc"
 	_ "github.com/chai2010/golangdoc/local/static"
 )
 
@@ -105,7 +108,7 @@ var (
 	notesRx = flag.String("notes", "BUG", "regular expression matching note markers to show")
 
 	// local language
-	lang = flag.String("lang", "zh_CN", "local language")
+	lang = flag.String("lang", "", "local language")
 )
 
 func usage() {
@@ -215,6 +218,17 @@ func main() {
 	}
 
 	corpus := godoc.NewCorpus(fs)
+
+	// i18n hook
+	corpus.SummarizePackage = func(pkg string) (summary string, showList, ok bool) {
+		summary = i18n.Synopsis(*lang, pkg)
+		ok = (summary != "")
+		return
+	}
+	corpus.TranslateDocPackage = func(pkg *doc.Package) *doc.Package {
+		return i18n.Package(*lang, pkg.ImportPath, pkg)
+	}
+
 	corpus.Verbose = *verbose
 	corpus.MaxResults = *maxResults
 	corpus.IndexEnabled = *indexEnabled && httpMode

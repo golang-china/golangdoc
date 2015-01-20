@@ -8,6 +8,8 @@ package pkgdoc
 
 import (
 	"go/doc"
+
+	"github.com/chai2010/golangdoc/i18n"
 )
 
 func OriginDocPackage(lang, importPath string) *doc.Package {
@@ -28,4 +30,12 @@ func TranslateDocPackage(lang, importPath string) *doc.Package {
 		}
 	}
 	return nil
+}
+
+func init() {
+	for lang, pkgList := range TranslateDocPackageTable {
+		for _, pkg := range pkgList {
+			i18n.RegisterPackage(lang, pkg)
+		}
+	}
 }

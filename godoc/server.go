@@ -129,6 +129,10 @@ func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode) 
 				m |= doc.AllMethods
 			}
 			info.PDoc = doc.New(pkg, pathpkg.Clean(relpath), m) // no trailing '/' in importpath
+			if h.c.TranslateDocPackage != nil {
+				info.PDoc = h.c.TranslateDocPackage(info.PDoc)
+			}
+
 			if mode&NoTypeAssoc != 0 {
 				for _, t := range info.PDoc.Types {
 					info.PDoc.Consts = append(info.PDoc.Consts, t.Consts...)
