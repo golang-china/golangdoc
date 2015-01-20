@@ -32,7 +32,7 @@ func mapKey(lang, importPath, id string) string {
 	return fmt.Sprintf("i18n:%s:%s", lang, importPath, id)
 }
 
-func methodId(typeName, methodName string) string {
+func MethodId(typeName, methodName string) string {
 	return typeName + "." + methodName
 }
 
@@ -72,7 +72,7 @@ func initDocTable(lang string, pkg *doc.Package) {
 			docTable[mapKey(lang, pkg.ImportPath, x.Name)] = x.Doc
 		}
 		for _, x := range v.Methods {
-			docTable[mapKey(lang, pkg.ImportPath, methodId(v.Name, x.Name))] = x.Doc
+			docTable[mapKey(lang, pkg.ImportPath, MethodId(v.Name, x.Name))] = x.Doc
 		}
 	}
 	for _, v := range pkg.Vars {
@@ -168,7 +168,7 @@ func trPackage(lang, importPath string, pkg *doc.Package) *doc.Package {
 			}
 		}
 		for j := 0; j < len(pkg.Types[i].Methods); j++ {
-			id := methodId(pkg.Types[i].Name, pkg.Types[i].Methods[j].Name)
+			id := MethodId(pkg.Types[i].Name, pkg.Types[i].Methods[j].Name)
 			key := mapKey(lang, pkg.ImportPath, id)
 			if s, _ := docTable[key]; s != "" {
 				pkg.Types[i].Methods[j].Doc = s
