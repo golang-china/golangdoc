@@ -1,5 +1,9 @@
 # Godoc for Golang, support translate.
 
+Download Chinese Translate:
+
+	git clone https://github.com/chai2010/golangdoc.local.git $(GOROOT)/godoc_local
+
 Start Chinese Godoc:
 
 	go get github.com/chai2010/golangdoc
@@ -7,10 +11,7 @@ Start Chinese Godoc:
 
 See:
 
-- http://godoc.org/github.com/chai2010/golangdoc/i18n
-- http://godoc.org/github.com/chai2010/golangdoc/local/static
-- http://godoc.org/github.com/chai2010/golangdoc/local/pkgdoc
-- http://godoc.org/github.com/chai2010/golangdoc/local/pkgdoc/zh_CN/unsafe
+- http://godoc.org/github.com/chai2010/golangdoc/local
 
 
 # BUGS

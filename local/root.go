@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package pkgdoc
+package local
 
 import (
-	"testing"
+	"github.com/chai2010/golangdoc/godoc/vfs"
 )
 
-func TestFoo(t *testing.T) {
-	// TODO
+type rootTranslater struct {
+	nilTranslater
+}
+
+func (p *rootTranslater) Root() vfs.FileSystem {
+	return nil
 }

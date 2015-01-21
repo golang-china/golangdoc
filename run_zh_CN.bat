@@ -7,3 +7,4 @@ setlocal
 cd %~dp0
 
 set GOPATH="" && golangdoc.exe -http=:6060 -lang=zh_CN
+pause

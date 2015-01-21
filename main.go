@@ -28,7 +28,6 @@
 package main
 
 import (
-	"archive/zip"
 	_ "expvar" // to serve /debug/vars
 	"flag"
 	"fmt"
@@ -49,10 +48,9 @@ import (
 	"github.com/chai2010/golangdoc/godoc/analysis"
 	"github.com/chai2010/golangdoc/godoc/vfs"
 	"github.com/chai2010/golangdoc/godoc/vfs/gatefs"
-	"github.com/chai2010/golangdoc/godoc/vfs/mapfs"
-	"github.com/chai2010/golangdoc/godoc/vfs/zipfs"
-	"github.com/chai2010/golangdoc/i18n"
 
+	"github.com/chai2010/golangdoc/local"
+	_ "github.com/chai2010/golangdoc/local/doc"
 	_ "github.com/chai2010/golangdoc/local/pkgdoc"
 	_ "github.com/chai2010/golangdoc/local/static"
 )
@@ -177,24 +175,10 @@ func main() {
 	fsGate = make(chan bool, 20)
 
 	// Determine file system to use.
-	if *zipfile == "" {
-		// use file system of underlying OS
-		rootfs := gatefs.New(vfs.OS(*goroot), fsGate)
-		fs.Bind("/", rootfs, "/", vfs.BindReplace)
-	} else {
-		// use file system specified via .zip file (path separator must be '/')
-		rc, err := zip.OpenReader(*zipfile)
-		if err != nil {
-			log.Fatalf("%s: %s\n", *zipfile, err)
-		}
-		defer rc.Close() // be nice (e.g., -writeIndex mode)
-		fs.Bind("/", zipfs.New(rc, *zipfile), *goroot, vfs.BindReplace)
-	}
-	if *templateDir != "" {
-		fs.Bind("/lib/godoc", vfs.OS(*templateDir), "/", vfs.BindBefore)
-	} else {
-		fs.Bind("/lib/godoc", mapfs.New(i18n.StaticFiles(*lang)), "/", vfs.BindReplace)
-	}
+	local.Init(*goroot, *zipfile, *templateDir)
+	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
+	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
+	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)
 
 	// Bind $GOPATH trees into Go root.
 	for _, p := range filepath.SplitList(build.Default.GOPATH) {
@@ -219,14 +203,16 @@ func main() {
 
 	corpus := godoc.NewCorpus(fs)
 
-	// i18n hook
-	corpus.SummarizePackage = func(pkg string) (summary string, showList, ok bool) {
-		summary = i18n.Synopsis(*lang, pkg)
+	// translate hook
+	corpus.SummarizePackage = func(importPath string) (summary string, showList, ok bool) {
+		if pkg := local.Package(*lang, importPath); pkg != nil {
+			summary = doc.Synopsis(pkg.Doc)
+		}
 		ok = (summary != "")
 		return
 	}
 	corpus.TranslateDocPackage = func(pkg *doc.Package) *doc.Package {
-		return i18n.Package(*lang, pkg.ImportPath, pkg)
+		return local.Package(*lang, pkg.ImportPath, pkg)
 	}
 
 	corpus.Verbose = *verbose

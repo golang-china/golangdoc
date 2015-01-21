@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:generate go run generate.go
-
 package static
 
 import (
 	"github.com/chai2010/golangdoc/godoc/static"
-	"github.com/chai2010/golangdoc/i18n"
+	"github.com/chai2010/golangdoc/godoc/vfs/mapfs"
+	"github.com/chai2010/golangdoc/local"
 )
 
 func Files(lang ...string) map[string]string {
@@ -22,6 +21,6 @@ func Files(lang ...string) map[string]string {
 
 func init() {
 	for lang, files := range StaticFilesTable {
-		i18n.RegisterStaticFiles(lang, files)
+		local.RegisterStaticFS(lang, mapfs.New(files))
 	}
 }

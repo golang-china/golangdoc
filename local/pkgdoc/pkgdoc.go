@@ -9,7 +9,7 @@ package pkgdoc
 import (
 	"go/doc"
 
-	"github.com/chai2010/golangdoc/i18n"
+	"github.com/chai2010/golangdoc/local"
 )
 
 func OriginDocPackage(lang, importPath string) *doc.Package {
@@ -35,7 +35,7 @@ func TranslateDocPackage(lang, importPath string) *doc.Package {
 func init() {
 	for lang, pkgList := range TranslateDocPackageTable {
 		for _, pkg := range pkgList {
-			i18n.RegisterPackage(lang, pkg)
+			local.RegisterPackage(lang, pkg)
 		}
 	}
 }
