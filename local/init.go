@@ -7,6 +7,7 @@ package local
 import (
 	"archive/zip"
 	"log"
+	"path/filepath"
 	"runtime"
 
 	"github.com/chai2010/golangdoc/godoc/static"
@@ -15,19 +16,21 @@ import (
 	"github.com/chai2010/golangdoc/godoc/vfs/zipfs"
 )
 
+// Default is the translations dir.
 const (
 	Default = "translations" // $(RootFS)/translations
 )
 
 var (
-	defaultRootFS     vfs.FileSystem = vfs.OS(runtime.GOROOT())
-	defaultStaticFS   vfs.FileSystem = mapfs.New(static.Files)
-	defaultDocFS      vfs.FileSystem = getNameSpace(defaultRootFS, "/doc")
-	defaultLocalFS    vfs.FileSystem = getNameSpace(defaultRootFS, "/"+Default)
-	defaultTranslater Translater     = new(localTranslater)
+	defaultRootFS     vfs.NameSpace = getNameSpace(vfs.OS(runtime.GOROOT()), "/")
+	defaultStaticFS   vfs.NameSpace = getNameSpace(mapfs.New(static.Files), "/")
+	defaultDocFS      vfs.NameSpace = getNameSpace(defaultRootFS, "/doc")
+	defaultLocalFS    vfs.NameSpace = getNameSpace(defaultRootFS, "/"+Default)
+	defaultTranslater Translater    = new(localTranslater)
 )
 
-func Init(goRoot, goZipFile, goTemplateDir string) {
+// Init initialize the translations environment.
+func Init(goRoot, goZipFile, goTemplateDir, goPath string) {
 	if goZipFile != "" {
 		rc, err := zip.OpenReader(goZipFile)
 		if err != nil {
@@ -40,22 +43,28 @@ func Init(goRoot, goZipFile, goTemplateDir string) {
 		defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
 	} else {
 		if goRoot != "" && goRoot != runtime.GOROOT() {
-			defaultRootFS = vfs.OS(goRoot)
+			defaultRootFS = getNameSpace(vfs.OS(goRoot), "/")
 			defaultDocFS = getNameSpace(defaultRootFS, "/doc")
 			defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
 		}
 	}
 
 	if goTemplateDir != "" {
-		defaultStaticFS = vfs.OS(goTemplateDir)
+		defaultStaticFS = getNameSpace(vfs.OS(goTemplateDir), "/")
+	}
+
+	// Bind $GOPATH trees into Go root.
+	for _, p := range filepath.SplitList(goPath) {
+		defaultRootFS.Bind("/src", vfs.OS(p), "/src", vfs.BindAfter)
 	}
 }
 
-func getNameSpace(fs vfs.FileSystem, ns string) vfs.FileSystem {
+func getNameSpace(fs vfs.FileSystem, ns string) vfs.NameSpace {
+	newns := make(vfs.NameSpace)
 	if ns != "" {
-		subfs := make(vfs.NameSpace)
-		subfs.Bind("/", fs, ns, vfs.BindReplace)
-		return subfs
+		newns.Bind("/", fs, ns, vfs.BindReplace)
+	} else {
+		newns.Bind("/", fs, "/", vfs.BindReplace)
 	}
-	return fs
+	return newns
 }

@@ -39,7 +39,6 @@ import (
 	_ "net/http/pprof" // to serve /debug/pprof/*
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -47,7 +46,6 @@ import (
 	"github.com/chai2010/golangdoc/godoc"
 	"github.com/chai2010/golangdoc/godoc/analysis"
 	"github.com/chai2010/golangdoc/godoc/vfs"
-	"github.com/chai2010/golangdoc/godoc/vfs/gatefs"
 	"github.com/chai2010/golangdoc/local"
 )
 
@@ -157,19 +155,11 @@ func handleURLFlag() {
 }
 
 func runGodoc() {
-	var fsGate chan bool
-	fsGate = make(chan bool, 20)
-
 	// Determine file system to use.
-	local.Init(*goroot, *zipfile, *templateDir)
+	local.Init(*goroot, *zipfile, *templateDir, build.Default.GOPATH)
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
 	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
 	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)
-
-	// Bind $GOPATH trees into Go root.
-	for _, p := range filepath.SplitList(build.Default.GOPATH) {
-		fs.Bind("/src", gatefs.New(vfs.OS(p), fsGate), "/src", vfs.BindAfter)
-	}
 
 	httpMode := *httpAddr != ""
 

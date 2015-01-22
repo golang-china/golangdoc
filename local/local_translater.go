@@ -17,10 +17,6 @@ import (
 
 type localTranslater struct{}
 
-func (p *localTranslater) RootFS() vfs.FileSystem {
-	return defaultLocalFS
-}
-
 func (p *localTranslater) Static(lang string) vfs.FileSystem {
 	return p.NameSpace("/" + lang + "/static")
 }
@@ -46,26 +42,20 @@ func (p *localTranslater) ParseDocPackage(lang, importPath string) *doc.Package 
 	if importPath == "" || importPath[0] == '/' {
 		return nil
 	}
-
-	// $(lang)/src/builtin/doc_$(lang).go
-	filename := fmt.Sprintf("/%s/src/%s/doc_%s.go", lang, importPath, lang)
-	if !p.fileExists(filename) {
-		return nil
-	}
-	docCode, err := vfs.ReadFile(p.RootFS(), filename)
-	if err != nil {
+	docCode := p.loadDocCode(lang, importPath)
+	if docCode == nil {
 		return nil
 	}
 
 	// parse doc
 	fset := token.NewFileSet()
-	astFile, err := parser.ParseFile(fset, filename, docCode, parser.ParseComments)
+	astFile, err := parser.ParseFile(fset, importPath, docCode, parser.ParseComments)
 	if err != nil {
 		log.Printf("local.localTranslater.ParseDocPackage: err = %v\n", err)
 		return nil
 	}
 	astPkg, _ := ast.NewPackage(fset,
-		map[string]*ast.File{filename: astFile},
+		map[string]*ast.File{importPath: astFile},
 		nil,
 		nil,
 	)
@@ -75,25 +65,40 @@ func (p *localTranslater) ParseDocPackage(lang, importPath string) *doc.Package 
 
 func (p *localTranslater) NameSpace(ns string) vfs.FileSystem {
 	if ns != "" {
-		if fi, err := p.RootFS().Stat(ns); err != nil || !fi.IsDir() {
+		if fi, err := defaultLocalFS.Stat(ns); err != nil || !fi.IsDir() {
 			return nil
 		}
 		subfs := make(vfs.NameSpace)
-		subfs.Bind("/", p.RootFS(), ns, vfs.BindReplace)
+		subfs.Bind("/", defaultLocalFS, ns, vfs.BindReplace)
 		return subfs
 	}
-	return p.RootFS()
+	return defaultLocalFS
 }
 
-func (p *localTranslater) dirExists(name string) bool {
-	if fi, err := p.RootFS().Stat(name); err != nil || !fi.IsDir() {
-		return false
+func (p *localTranslater) loadDocCode(lang, importPath string) []byte {
+	// $(GOROOT)/translates/$(lang)/src/builtin/doc_$(lang).go
+	filename := fmt.Sprintf("/%s/src/%s/doc_%s.go", lang, importPath, lang)
+	if p.fileExists(defaultLocalFS, filename) {
+		docCode, _ := vfs.ReadFile(defaultLocalFS, filename)
+		if docCode != nil {
+			return docCode
+		}
 	}
-	return true
+
+	// $(GOROOT)/src/builtin/doc_$(lang).go
+	filename = fmt.Sprintf("/src/%s/doc_%s.go", importPath, lang)
+	if p.fileExists(defaultRootFS, filename) {
+		docCode, _ := vfs.ReadFile(defaultRootFS, filename)
+		if docCode != nil {
+			return docCode
+		}
+	}
+
+	return nil
 }
 
-func (p *localTranslater) fileExists(name string) bool {
-	if fi, err := p.RootFS().Stat(name); err != nil || fi.IsDir() {
+func (p *localTranslater) fileExists(fs vfs.NameSpace, name string) bool {
+	if fi, err := fs.Stat(name); err != nil || fi.IsDir() {
 		return false
 	}
 	return true

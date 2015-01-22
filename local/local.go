@@ -17,6 +17,7 @@ const (
 	__doc__  = "__doc__"
 )
 
+// Translater interface.
 type Translater interface {
 	Static(lang string) vfs.FileSystem
 	Document(lang string) vfs.FileSystem
@@ -39,27 +40,33 @@ func methodId(typeName, methodName string) string {
 	return typeName + "." + methodName
 }
 
+// RegisterStaticFS Register StaticFS.
 func RegisterStaticFS(lang string, staticFiles vfs.FileSystem) {
 	staticFSTable[lang] = staticFiles
 }
 
+// RegisterDocumentFS Register DocumentFS.
 func RegisterDocumentFS(lang string, docFiles vfs.FileSystem) {
 	docFSTable[lang] = docFiles
 }
 
+// RegisterPackage Register Package.
 func RegisterPackage(lang string, pkg *doc.Package) {
 	pkgDocTable[mapKey(lang, pkg.ImportPath, __pkg__)] = pkg
 	initDocTable(lang, pkg)
 }
 
+// RegisterTranslater Register Translater.
 func RegisterTranslater(tr Translater) {
 	trList = append(trList, tr)
 }
 
+// RootFS return root filesystem.
 func RootFS() vfs.FileSystem {
 	return defaultRootFS
 }
 
+// StaticFS return Static filesystem.
 func StaticFS(lang string) vfs.FileSystem {
 	if fs, _ := staticFSTable[lang]; fs != nil {
 		return fs
@@ -75,6 +82,7 @@ func StaticFS(lang string) vfs.FileSystem {
 	return defaultStaticFS
 }
 
+// DocumentFS return Document filesystem.
 func DocumentFS(lang string) vfs.FileSystem {
 	if fs, _ := docFSTable[lang]; fs != nil {
 		return fs
@@ -90,6 +98,7 @@ func DocumentFS(lang string) vfs.FileSystem {
 	return defaultDocFS
 }
 
+// Package translate Package doc.
 func Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
 	if len(pkg) > 0 && pkg[0] != nil {
 		if p := trPackage(lang, pkg[0].ImportPath, pkg[0]); p != nil {
