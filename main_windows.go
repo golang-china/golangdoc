@@ -4,14 +4,14 @@
 
 // Godoc service
 //
-//	# install uis as windows service
+//	# install as windows service
 //	golangdoc -service-install -http=:6060
 //
-//	# start/stop uis service
+//	# start/stop service
 //	golangdoc -service-start
 //	golangdoc -service-stop
 //
-//	# remove uis service
+//	# remove service
 //	golangdoc -service-remove
 //
 
