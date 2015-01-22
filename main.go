@@ -50,7 +50,7 @@ import (
 	"github.com/chai2010/golangdoc/godoc/vfs/gatefs"
 
 	"github.com/chai2010/golangdoc/local"
-	_ "github.com/chai2010/golangdoc/local/doc"
+	local_doc "github.com/chai2010/golangdoc/local/doc"
 	_ "github.com/chai2010/golangdoc/local/pkgdoc"
 	_ "github.com/chai2010/golangdoc/local/static"
 )
@@ -160,22 +160,13 @@ func handleURLFlag() {
 	log.Fatalf("too many redirects")
 }
 
-func main() {
-	flag.Usage = usage
-	flag.Parse()
-
-	playEnabled = *showPlayground
-
-	// Check usage: either server and no args, command line and args, or index creation mode
-	if (*httpAddr != "" || *urlFlag != "") != (flag.NArg() == 0) && !*writeIndex {
-		usage()
-	}
-
+func runGodoc() {
 	var fsGate chan bool
 	fsGate = make(chan bool, 20)
 
 	// Determine file system to use.
 	local.Init(*goroot, *zipfile, *templateDir)
+	local_doc.Init(*goroot, *zipfile, *templateDir)
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
 	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
 	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)

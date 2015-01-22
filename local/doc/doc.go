@@ -13,8 +13,14 @@ import (
 	"github.com/chai2010/golangdoc/local"
 )
 
-func init() {
-	zhDocPath := path.Join(runtime.GOROOT(), local.BaseName, "zh_CN", "doc")
+func Init(goRoot, goZipFile, goTemplateDir string) {
+	if goZipFile != "" {
+		return
+	}
+	if goRoot == "" {
+		goRoot = runtime.GOROOT()
+	}
+	zhDocPath := path.Join(goRoot, local.BaseName, "zh_CN", "doc")
 	if isDirExist(zhDocPath) {
 		local.RegisterDocFS("zh_CN", vfs.OS(zhDocPath))
 	}
