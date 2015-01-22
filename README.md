@@ -2,7 +2,7 @@
 
 Download Chinese Translate:
 
-	git clone https://github.com/chai2010/golangdoc.local.git $(GOROOT)/godoc_local
+	git clone https://github.com/chai2010/golangdoc.local.git $(GOROOT)/translations
 
 Start Chinese Godoc:
 

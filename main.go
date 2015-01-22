@@ -48,11 +48,7 @@ import (
 	"github.com/chai2010/golangdoc/godoc/analysis"
 	"github.com/chai2010/golangdoc/godoc/vfs"
 	"github.com/chai2010/golangdoc/godoc/vfs/gatefs"
-
 	"github.com/chai2010/golangdoc/local"
-	local_doc "github.com/chai2010/golangdoc/local/doc"
-	_ "github.com/chai2010/golangdoc/local/pkgdoc"
-	_ "github.com/chai2010/golangdoc/local/static"
 )
 
 const (
@@ -166,7 +162,6 @@ func runGodoc() {
 
 	// Determine file system to use.
 	local.Init(*goroot, *zipfile, *templateDir)
-	local_doc.Init(*goroot, *zipfile, *templateDir)
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
 	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
 	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)

@@ -43,7 +43,7 @@ func RegisterStaticFS(lang string, staticFiles vfs.FileSystem) {
 	staticFSTable[lang] = staticFiles
 }
 
-func RegisterDocFS(lang string, docFiles vfs.FileSystem) {
+func RegisterDocumentFS(lang string, docFiles vfs.FileSystem) {
 	docFSTable[lang] = docFiles
 }
 
@@ -69,6 +69,9 @@ func StaticFS(lang string) vfs.FileSystem {
 			return fs
 		}
 	}
+	if fs := defaultTranslater.Static(lang); fs != nil {
+		return fs
+	}
 	return defaultStaticFS
 }
 
@@ -80,6 +83,9 @@ func DocumentFS(lang string) vfs.FileSystem {
 		if fs := tr.Document(lang); fs != nil {
 			return fs
 		}
+	}
+	if fs := defaultTranslater.Document(lang); fs != nil {
+		return fs
 	}
 	return defaultDocFS
 }
@@ -98,6 +104,9 @@ func Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
 		if p := tr.Package(lang, importPath, pkg...); p != nil {
 			return p
 		}
+	}
+	if fs := defaultTranslater.Package(lang, importPath, pkg...); fs != nil {
+		return fs
 	}
 	if len(pkg) > 0 {
 		return pkg[0]

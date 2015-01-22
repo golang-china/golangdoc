@@ -16,13 +16,15 @@ import (
 )
 
 const (
-	BaseName = "godoc_local" // e.g. $(GOROOT)/godoc_local.zip
+	Default = "translations" // $(RootFS)/translations
 )
 
 var (
-	defaultRootFS   vfs.FileSystem = vfs.OS(runtime.GOROOT())
-	defaultStaticFS vfs.FileSystem = mapfs.New(static.Files)
-	defaultDocFS    vfs.FileSystem = getNameSpace(defaultRootFS, "/doc")
+	defaultRootFS     vfs.FileSystem = vfs.OS(runtime.GOROOT())
+	defaultStaticFS   vfs.FileSystem = mapfs.New(static.Files)
+	defaultDocFS      vfs.FileSystem = getNameSpace(defaultRootFS, "/doc")
+	defaultLocalFS    vfs.FileSystem = getNameSpace(defaultRootFS, "/"+Default)
+	defaultTranslater Translater     = new(localTranslater)
 )
 
 func Init(goRoot, goZipFile, goTemplateDir string) {
@@ -35,10 +37,12 @@ func Init(goRoot, goZipFile, goTemplateDir string) {
 
 		defaultRootFS = getNameSpace(zipfs.New(rc, goZipFile), goRoot)
 		defaultDocFS = getNameSpace(defaultRootFS, "/doc")
+		defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
 	} else {
 		if goRoot != "" && goRoot != runtime.GOROOT() {
 			defaultRootFS = vfs.OS(goRoot)
 			defaultDocFS = getNameSpace(defaultRootFS, "/doc")
+			defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
 		}
 	}
 
@@ -50,7 +54,7 @@ func Init(goRoot, goZipFile, goTemplateDir string) {
 func getNameSpace(fs vfs.FileSystem, ns string) vfs.FileSystem {
 	if ns != "" {
 		subfs := make(vfs.NameSpace)
-		subfs.Bind("/", defaultRootFS, ns, vfs.BindReplace)
+		subfs.Bind("/", fs, ns, vfs.BindReplace)
 		return subfs
 	}
 	return fs
