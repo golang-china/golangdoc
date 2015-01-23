@@ -52,7 +52,7 @@ func (p *localTranslater) Package(lang, importPath string, pkg ...*doc.Package) 
 }
 
 func (p *localTranslater) ParseDocPackage(lang, importPath string) *doc.Package {
-	if importPath == "" || importPath[0] == '/' {
+	if lang == "" || importPath == "" || importPath[0] == '/' {
 		return nil
 	}
 	docCode := p.loadDocCode(lang, importPath)
@@ -89,22 +89,32 @@ func (p *localTranslater) NameSpace(ns string) vfs.FileSystem {
 }
 
 func (p *localTranslater) loadDocCode(lang, importPath string) []byte {
+	// {FS}:/src/importPath/doc_$(lang)_GOOS_GOARCH.go
+	// {FS}:/src/importPath/doc_$(lang)_GOARCH.go
+	// {FS}:/src/importPath/doc_$(lang)_GOOS.go
 	// {FS}:/src/importPath/doc_$(lang).go
-	filename := fmt.Sprintf("/src/%s/doc_%s.go", importPath, lang)
-
-	// $(GOROOT)/translates/
-	if p.fileExists(defaultLocalFS, filename) {
-		docCode, _ := vfs.ReadFile(defaultLocalFS, filename)
-		if docCode != nil {
-			return docCode
-		}
+	filenames := []string{
+		fmt.Sprintf("/src/%s/doc_%s_%s_%s.go", importPath, lang, defaultGodocGoos, defaultGodocGoarch),
+		fmt.Sprintf("/src/%s/doc_%s_%s.go", importPath, lang, defaultGodocGoarch),
+		fmt.Sprintf("/src/%s/doc_%s_%s.go", importPath, lang, defaultGodocGoos),
+		fmt.Sprintf("/src/%s/doc_%s.go", importPath, lang),
 	}
 
-	// $(GOROOT)/
-	if p.fileExists(defaultRootFS, filename) {
-		docCode, _ := vfs.ReadFile(defaultRootFS, filename)
-		if docCode != nil {
-			return docCode
+	for i := 0; i < len(filenames); i++ {
+		// $(GOROOT)/translates/
+		if p.fileExists(defaultLocalFS, filenames[i]) {
+			docCode, _ := vfs.ReadFile(defaultLocalFS, filenames[i])
+			if docCode != nil {
+				return docCode
+			}
+		}
+
+		// $(GOROOT)/
+		if p.fileExists(defaultRootFS, filenames[i]) {
+			docCode, _ := vfs.ReadFile(defaultRootFS, filenames[i])
+			if docCode != nil {
+				return docCode
+			}
 		}
 	}
 

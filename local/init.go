@@ -7,8 +7,10 @@ package local
 import (
 	"archive/zip"
 	"log"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"golang.org/x/tools/godoc/static"
 	"golang.org/x/tools/godoc/vfs"
@@ -22,12 +24,28 @@ const (
 )
 
 var (
-	defaultRootFS     vfs.NameSpace = getNameSpace(vfs.OS(runtime.GOROOT()), "/")
-	defaultStaticFS   vfs.NameSpace = getNameSpace(mapfs.New(static.Files), "/")
-	defaultDocFS      vfs.NameSpace = getNameSpace(defaultRootFS, "/doc")
-	defaultLocalFS    vfs.NameSpace = getNameSpace(defaultRootFS, "/"+Default)
-	defaultTranslater Translater    = new(localTranslater)
+	defaultGodocGoos                 = getGodocGoos()
+	defaultGodocGoarch               = getGodocGoarch()
+	defaultRootFS      vfs.NameSpace = getNameSpace(vfs.OS(runtime.GOROOT()), "/")
+	defaultStaticFS    vfs.NameSpace = getNameSpace(mapfs.New(static.Files), "/")
+	defaultDocFS       vfs.NameSpace = getNameSpace(defaultRootFS, "/doc")
+	defaultLocalFS     vfs.NameSpace = getNameSpace(defaultRootFS, "/"+Default)
+	defaultTranslater  Translater    = new(localTranslater)
 )
+
+func getGodocGoos() string {
+	if v := strings.TrimSpace(os.Getenv("GOOS")); v != "" {
+		return v
+	}
+	return runtime.GOOS
+}
+
+func getGodocGoarch() string {
+	if v := strings.TrimSpace(os.Getenv("GOARCH")); v != "" {
+		return v
+	}
+	return runtime.GOARCH
+}
 
 // Init initialize the translations environment.
 func Init(goRoot, goZipFile, goTemplateDir, goPath string) {
