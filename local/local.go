@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"go/doc"
 
-	"github.com/chai2010/golangdoc/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs"
 )
 
 const (
@@ -68,6 +68,9 @@ func RootFS() vfs.FileSystem {
 
 // StaticFS return Static filesystem.
 func StaticFS(lang string) vfs.FileSystem {
+	if lang == "" {
+		return defaultStaticFS
+	}
 	if fs, _ := staticFSTable[lang]; fs != nil {
 		return fs
 	}
@@ -84,6 +87,9 @@ func StaticFS(lang string) vfs.FileSystem {
 
 // DocumentFS return Document filesystem.
 func DocumentFS(lang string) vfs.FileSystem {
+	if lang == "" {
+		return defaultDocFS
+	}
 	if fs, _ := docFSTable[lang]; fs != nil {
 		return fs
 	}
@@ -100,6 +106,13 @@ func DocumentFS(lang string) vfs.FileSystem {
 
 // Package translate Package doc.
 func Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
+	if lang == "" {
+		if len(pkg) > 0 {
+			return pkg[0]
+		} else {
+			return nil
+		}
+	}
 	if len(pkg) > 0 && pkg[0] != nil {
 		if p := trPackage(lang, pkg[0].ImportPath, pkg[0]); p != nil {
 			return p

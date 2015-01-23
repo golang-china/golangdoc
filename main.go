@@ -43,9 +43,10 @@ import (
 	"runtime"
 	"strings"
 
+	"golang.org/x/tools/godoc/analysis"
+	"golang.org/x/tools/godoc/vfs"
+
 	"github.com/chai2010/golangdoc/godoc"
-	"github.com/chai2010/golangdoc/godoc/analysis"
-	"github.com/chai2010/golangdoc/godoc/vfs"
 	"github.com/chai2010/golangdoc/local"
 )
 

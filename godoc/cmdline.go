@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/chai2010/golangdoc/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs"
 )
 
 const (

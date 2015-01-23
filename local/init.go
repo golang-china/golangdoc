@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/chai2010/golangdoc/godoc/static"
-	"github.com/chai2010/golangdoc/godoc/vfs"
-	"github.com/chai2010/golangdoc/godoc/vfs/mapfs"
-	"github.com/chai2010/golangdoc/godoc/vfs/zipfs"
+	"golang.org/x/tools/godoc/static"
+	"golang.org/x/tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs/mapfs"
+	"golang.org/x/tools/godoc/vfs/zipfs"
 )
 
 // Default is the translations dir.

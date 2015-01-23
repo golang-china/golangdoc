@@ -12,20 +12,33 @@ import (
 	"go/token"
 	"log"
 
-	"github.com/chai2010/golangdoc/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs"
 )
 
 type localTranslater struct{}
 
 func (p *localTranslater) Static(lang string) vfs.FileSystem {
+	if lang == "" {
+		return defaultStaticFS
+	}
 	return p.NameSpace("/static/" + lang)
 }
 
 func (p *localTranslater) Document(lang string) vfs.FileSystem {
+	if lang == "" {
+		return defaultDocFS
+	}
 	return p.NameSpace("/doc/" + lang)
 }
 
 func (p *localTranslater) Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
+	if lang == "" {
+		if len(pkg) > 0 {
+			return pkg[0]
+		} else {
+			return nil
+		}
+	}
 
 	// try parse and register new pkg doc
 	localPkg := p.ParseDocPackage(lang, importPath)
