@@ -69,21 +69,21 @@ func main() {
 	}
 	if *flagServiceUninstall {
 		if err := removeService(ServiceName); err != nil {
-			log.Fatalf("removeService:", err)
+			log.Fatalf("removeService: %v\n", err)
 		}
 		fmt.Printf("Done\n")
 		return
 	}
 	if *flagServiceStart {
 		if err := startService(ServiceName); err != nil {
-			log.Fatalf("startService:", err)
+			log.Fatalf("startService: %v\n", err)
 		}
 		fmt.Printf("Done\n")
 		return
 	}
 	if *flagServiceStop {
 		if err := controlService(ServiceName, svc.Stop, svc.Stopped); err != nil {
-			log.Fatalf("stopService:", err)
+			log.Fatalf("stopService: %v\n", err)
 		}
 		fmt.Printf("Done\n")
 		return

@@ -33,7 +33,7 @@ var (
 )
 
 func mapKey(lang, importPath, id string) string {
-	return fmt.Sprintf("i18n:%s:%s", lang, importPath, id)
+	return fmt.Sprintf("/%s/%s@%s", importPath, id, lang)
 }
 
 func methodId(typeName, methodName string) string {

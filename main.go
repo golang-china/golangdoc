@@ -274,7 +274,6 @@ func runGodoc() {
 			default:
 				log.Print("identifier search index enabled")
 			}
-			fs.Fprint(os.Stderr)
 			handler = loggingHandler(handler)
 		}
 
