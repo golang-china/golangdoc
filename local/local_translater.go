@@ -18,11 +18,11 @@ import (
 type localTranslater struct{}
 
 func (p *localTranslater) Static(lang string) vfs.FileSystem {
-	return p.NameSpace("/" + lang + "/static")
+	return p.NameSpace("/static/" + lang)
 }
 
 func (p *localTranslater) Document(lang string) vfs.FileSystem {
-	return p.NameSpace("/" + lang + "/doc")
+	return p.NameSpace("/doc/" + lang)
 }
 
 func (p *localTranslater) Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
@@ -76,8 +76,10 @@ func (p *localTranslater) NameSpace(ns string) vfs.FileSystem {
 }
 
 func (p *localTranslater) loadDocCode(lang, importPath string) []byte {
-	// $(GOROOT)/translates/$(lang)/src/builtin/doc_$(lang).go
-	filename := fmt.Sprintf("/%s/src/%s/doc_%s.go", lang, importPath, lang)
+	// {FS}:/src/importPath/doc_$(lang).go
+	filename := fmt.Sprintf("/src/%s/doc_%s.go", importPath, lang)
+
+	// $(GOROOT)/translates/
 	if p.fileExists(defaultLocalFS, filename) {
 		docCode, _ := vfs.ReadFile(defaultLocalFS, filename)
 		if docCode != nil {
@@ -85,8 +87,7 @@ func (p *localTranslater) loadDocCode(lang, importPath string) []byte {
 		}
 	}
 
-	// $(GOROOT)/src/builtin/doc_$(lang).go
-	filename = fmt.Sprintf("/src/%s/doc_%s.go", importPath, lang)
+	// $(GOROOT)/
 	if p.fileExists(defaultRootFS, filename) {
 		docCode, _ := vfs.ReadFile(defaultRootFS, filename)
 		if docCode != nil {
