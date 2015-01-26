@@ -6,7 +6,7 @@
 // Generate Go pakckage doc for translate.
 //
 // Usage:
-//	docgen importPath lang... [-GOOS=...] [-GOARCH=...]
+//	docgen package lang... [-GOOS=...] [-GOARCH=...]
 //	docgen -h
 //
 // Example:
@@ -16,6 +16,8 @@
 //	docgen syscall zh_CN -GOOS=windows                     # for windows
 //	docgen syscall zh_CN -GOOS=windows -GOARCH=amd64       # for windows/amd64
 //	docgen syscall zh_CN                                   # for non windows
+//	docgen std     zh_CN                                   # all standard packages
+//	docgen ./...   zh_CN                                   # all sub packages
 //
 // Output:
 //	translations/src/builtin/doc_zh_CN.go
@@ -24,6 +26,8 @@
 //	translations/src/syscall/doc_zh_CN_windows.go          # for windows
 //	translations/src/syscall/doc_zh_CN_windows_amd64.go    # for windows/amd64
 //	translations/src/syscall/doc_zh_CN.go                  # for non windows
+//	translations/src/*/doc_zh_CN.go                        # all standard packages
+//	translations/src/*/doc_zh_CN.go                        # all sub packages
 //
 // Help:
 //	docgen -h
@@ -53,7 +57,7 @@ import (
 )
 
 const usage = `
-Usage: docgen importPath lang... [-GOOS=...] [-GOARCH=...]
+Usage: docgen package lang... [-GOOS=...] [-GOARCH=...]
   docgen -h
 
 Example:
@@ -63,6 +67,8 @@ Example:
   docgen syscall zh_CN -GOOS=windows                     # for windows
   docgen syscall zh_CN -GOOS=windows -GOARCH=amd64       # for windows/amd64
   docgen syscall zh_CN                                   # for non windows
+  docgen std     zh_CN                                   # all standard packages
+  docgen ./...   zh_CN                                   # all sub packages
 
 Output:
   translations/src/builtin/doc_zh_CN.go
@@ -71,6 +77,8 @@ Output:
   translations/src/syscall/doc_zh_CN_windows.go          # for windows
   translations/src/syscall/doc_zh_CN_windows_amd64.go    # for windows/amd64
   translations/src/syscall/doc_zh_CN.go                  # for non windows
+  translations/src/*/doc_zh_CN.go                        # all standard packages
+  translations/src/*/doc_zh_CN.go                        # all sub packages
 
 Help:
   docgen -h
@@ -81,17 +89,19 @@ Report bugs to <chaishushan{AT}gmail.com>.
 var (
 	flagGOOS       = ""
 	flagGOARCH     = ""
-	cmdArgPackage  = ""
-	cmdArgLangList = []string(nil)
+	cmdArgPackages = []string(nil)
+	cmdArgLangs    = []string(nil)
 )
 
 func main() {
 	parseCmdArgs()
-	for _, lang := range cmdArgLangList {
-		if importPath, err := docgen(cmdArgPackage, lang); err != nil {
-			log.Fatalf("gen %s failed, err = %v", docFilename(importPath, lang), err)
-		} else {
-			fmt.Printf("gen %s ok\n", docFilename(importPath, lang))
+	for i := 0; i < len(cmdArgPackages); i++ {
+		for _, lang := range cmdArgLangs {
+			if importPath, err := docgen(cmdArgPackages[i], lang); err != nil {
+				log.Fatalf("gen %s failed, err = %v", docFilename(importPath, lang), err)
+			} else {
+				fmt.Printf("gen %s ok\n", docFilename(importPath, lang))
+			}
 		}
 	}
 	fmt.Println("Done")
@@ -122,8 +132,22 @@ func parseCmdArgs() {
 		fmt.Fprintln(os.Stderr, usage[1:len(usage)-1])
 		os.Exit(1)
 	}
-	cmdArgPackage = args[0]
-	cmdArgLangList = args[1:]
+
+	cmdArgPackages = listPackages(args[0])
+	cmdArgLangs = args[1:]
+}
+
+func listPackages(name string) (pkgs []string) {
+	listOut, err := exec.Command(`go`, `list`, name).Output()
+	if err != nil {
+		log.Fatalf("listPackages: err = %v", err)
+	}
+	for _, line := range strings.Split(string(listOut), "\n") {
+		if s := strings.TrimSpace(line); s != "" {
+			pkgs = append(pkgs, s)
+		}
+	}
+	return
 }
 
 func docgen(name, lang string) (importPath string, err error) {
