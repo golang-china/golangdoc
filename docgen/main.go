@@ -12,14 +12,14 @@
 // Example:
 //	docgen builtin zh_CN
 //	docgen unsafe  zh_CN
-//	docgen unsafe  zh_CN zh_TW
-//	docgen syscall zh_CN zh_TW -GOOS=windows               # for windows
-//	docgen syscall zh_CN zh_TW -GOOS=windows -GOARCH=amd64 # for windows/amd64
-//	docgen syscall zh_CN zh_TW                             # for non windows
+//	docgen unsafe  zh_CN
+//	docgen syscall zh_CN -GOOS=windows                     # for windows
+//	docgen syscall zh_CN -GOOS=windows -GOARCH=amd64       # for windows/amd64
+//	docgen syscall zh_CN                                   # for non windows
 //
 // Output:
 //	translations/src/builtin/doc_zh_CN.go
-//	translations/src/unsafe/doc_zh_CN.go unsafe/doc_zh_TW.go
+//	translations/src/unsafe/doc_zh_CN.go
 //	translations/src/unsafe/doc_zh_CN.go
 //	translations/src/syscall/doc_zh_CN_windows.go          # for windows
 //	translations/src/syscall/doc_zh_CN_windows_amd64.go    # for windows/amd64
@@ -59,14 +59,14 @@ Usage: docgen importPath lang... [-GOOS=...] [-GOARCH=...]
 Example:
   docgen builtin zh_CN
   docgen unsafe  zh_CN
-  docgen unsafe  zh_CN zh_TW
-  docgen syscall zh_CN zh_TW -GOOS=windows               # for windows
-  docgen syscall zh_CN zh_TW -GOOS=windows -GOARCH=amd64 # for windows/amd64
-  docgen syscall zh_CN zh_TW                             # for non windows
+  docgen unsafe  zh_CN 
+  docgen syscall zh_CN -GOOS=windows                     # for windows
+  docgen syscall zh_CN -GOOS=windows -GOARCH=amd64       # for windows/amd64
+  docgen syscall zh_CN                                   # for non windows
 
 Output:
   translations/src/builtin/doc_zh_CN.go
-  translations/src/unsafe/doc_zh_CN.go unsafe/doc_zh_TW.go
+  translations/src/unsafe/doc_zh_CN.go
   translations/src/unsafe/doc_zh_CN.go
   translations/src/syscall/doc_zh_CN_windows.go          # for windows
   translations/src/syscall/doc_zh_CN_windows_amd64.go    # for windows/amd64
@@ -79,19 +79,20 @@ Report bugs to <chaishushan{AT}gmail.com>.
 `
 
 var (
-	flagGOOS         = ""
-	flagGOARCH       = ""
-	cmdArgImportPath = ""
-	cmdArgLangList   = []string(nil)
+	flagGOOS       = ""
+	flagGOARCH     = ""
+	cmdArgPackage  = ""
+	cmdArgLangList = []string(nil)
 )
 
 func main() {
 	parseCmdArgs()
 	for _, lang := range cmdArgLangList {
-		if err := docgen(cmdArgImportPath, lang); err != nil {
-			log.Fatalf("gen %s failed, err = %v", docFilename(cmdArgImportPath, lang), err)
+		if importPath, err := docgen(cmdArgPackage, lang); err != nil {
+			log.Fatalf("gen %s failed, err = %v", docFilename(importPath, lang), err)
+		} else {
+			fmt.Printf("gen %s ok\n", docFilename(importPath, lang))
 		}
-		fmt.Printf("gen %s ok\n", docFilename(cmdArgImportPath, lang))
 	}
 	fmt.Println("Done")
 }
@@ -121,28 +122,29 @@ func parseCmdArgs() {
 		fmt.Fprintln(os.Stderr, usage[1:len(usage)-1])
 		os.Exit(1)
 	}
-	cmdArgImportPath = args[0]
+	cmdArgPackage = args[0]
 	cmdArgLangList = args[1:]
 }
 
-func docgen(importPath, lang string) error {
-	info, err := ParsePackageInfo(cmdArgImportPath, lang)
+func docgen(name, lang string) (importPath string, err error) {
+	info, err := ParsePackageInfo(name, lang)
 	if err != nil {
-		return err
+		return
 	}
+	importPath = info.PDoc.ImportPath
 
 	filename := docFilename(importPath, lang)
 	os.MkdirAll(path.Dir(filename), 0666)
 
-	data, err := format.Source([]byte(info.String()))
+	data, err := format.Source(info.Bytes())
 	if err != nil {
-		return err
+		return
 	}
 	err = ioutil.WriteFile(filename, data, 0644)
 	if err != nil {
-		return err
+		return
 	}
-	return nil
+	return
 }
 
 func docFilename(importPath, lang string) string {
@@ -162,10 +164,12 @@ func docFilename(importPath, lang string) string {
 }
 
 type PackageInfo struct {
+	Lang      string
 	FSet      *token.FileSet
 	PAst      *ast.Package
 	PDoc      *doc.Package
 	PDocLocal *doc.Package
+	PDocMap   map[string]string
 }
 
 func ParsePackageInfo(name, lang string) (pkg *PackageInfo, err error) {
@@ -198,23 +202,78 @@ func ParsePackageInfo(name, lang string) (pkg *PackageInfo, err error) {
 	if err != nil {
 		return
 	}
-	pdoc := doc.New(past[pkgInfo.Name], pkgInfo.ImportPath, 0)
-	pdocLocal := local.Package(lang, pkgInfo.ImportPath, pdoc)
+
+	var mode doc.Mode
+	if pkgInfo.ImportPath == "builtin" {
+		mode = doc.AllDecls
+	}
+	pdoc := doc.New(past[pkgInfo.Name], pkgInfo.ImportPath, mode)
+	pdocLocal := local.Package(lang, pkgInfo.ImportPath)
 
 	pkg = &PackageInfo{
+		Lang:      lang,
 		FSet:      fset,
 		PAst:      past[pkgInfo.Name],
 		PDoc:      pdoc,
 		PDocLocal: pdocLocal,
+		PDocMap:   make(map[string]string),
+	}
+	pkg.initDocTable("", pkg.PDoc)
+	if pkg.PDocLocal != nil {
+		pkg.initDocTable(lang, pkg.PDocLocal)
 	}
 	return
 }
 
-func (p *PackageInfo) String() string {
+func (p *PackageInfo) mapKey(lang, importPath, id string) string {
+	return fmt.Sprintf("%s.%s@%s", importPath, id, lang)
+}
+
+func (p *PackageInfo) methodId(typeName, methodName string) string {
+	return typeName + "." + methodName
+}
+
+func (p *PackageInfo) initDocTable(lang string, pkg *doc.Package) {
+	for _, v := range pkg.Consts {
+		for _, id := range v.Names {
+			p.PDocMap[p.mapKey(lang, pkg.ImportPath, id)] = v.Doc
+		}
+	}
+	for _, v := range pkg.Types {
+		p.PDocMap[p.mapKey(lang, pkg.ImportPath, v.Name)] = v.Doc
+
+		for _, x := range v.Consts {
+			for _, id := range x.Names {
+				p.PDocMap[p.mapKey(lang, pkg.ImportPath, id)] = x.Doc
+			}
+		}
+		for _, x := range v.Vars {
+			for _, id := range x.Names {
+				p.PDocMap[p.mapKey(lang, pkg.ImportPath, id)] = x.Doc
+			}
+		}
+		for _, x := range v.Funcs {
+			p.PDocMap[p.mapKey(lang, pkg.ImportPath, x.Name)] = x.Doc
+		}
+		for _, x := range v.Methods {
+			p.PDocMap[p.mapKey(lang, pkg.ImportPath, p.methodId(v.Name, x.Name))] = x.Doc
+		}
+	}
+	for _, v := range pkg.Vars {
+		for _, id := range v.Names {
+			p.PDocMap[p.mapKey(lang, pkg.ImportPath, id)] = v.Doc
+		}
+	}
+	for _, v := range pkg.Funcs {
+		p.PDocMap[p.mapKey(lang, pkg.ImportPath, v.Name)] = v.Doc
+	}
+}
+
+func (p *PackageInfo) Bytes() []byte {
 	var docTemplate = template.Must(
 		template.New("doc").Funcs(template.FuncMap{
-			"comment_text": comment_textFunc,
-			"node":         nodeFunc,
+			"comment_text": p.comment_textFunc,
+			"node":         p.nodeFunc,
 		}).Parse(
 			tmplPackageText,
 		),
@@ -222,18 +281,38 @@ func (p *PackageInfo) String() string {
 
 	var out bytes.Buffer
 	if err := docTemplate.Execute(&out, p); err != nil {
-		return fmt.Sprintf("err = %v", err)
+		log.Fatal(fmt.Sprintf("PackageInfo.Bytes: err = %v", err))
 	}
-	return out.String()
+	return out.Bytes()
 }
 
-func comment_textFunc(comment, indent, preIndent string) string {
+func (p *PackageInfo) comment_textFunc(id, comment, indent, preIndent string) string {
+	if id == "" {
+		docOrigin := p.comment_format(p.PDoc.Doc, indent, preIndent, 80)
+		docLocal := docOrigin
+		if p.PDocLocal != nil {
+			docLocal = p.comment_format(p.PDocLocal.Doc, indent, preIndent, 40)
+		}
+		return docOrigin + "\n\n" + docLocal
+	} else {
+		docOriginComment, _ := p.PDocMap[p.mapKey("", p.PDoc.ImportPath, id)]
+		docOrigin := p.comment_format(docOriginComment, indent, preIndent, 80)
+		docLocalComment := docOriginComment
+		docLocal := docOrigin
+		if p.PDocLocal != nil {
+			docLocalComment, _ = p.PDocMap[p.mapKey(p.Lang, p.PDocLocal.ImportPath, id)]
+			docLocal = p.comment_format(docLocalComment, indent, preIndent, 40)
+		}
+		return docOrigin + "\n\n" + docLocal
+	}
+}
+
+func (p *PackageInfo) comment_format(comment, indent, preIndent string, punchCardWidth int) string {
 	containsOnlySpace := func(buf []byte) bool {
 		isNotSpace := func(r rune) bool { return !unicode.IsSpace(r) }
 		return bytes.IndexFunc(buf, isNotSpace) == -1
 	}
 	var buf bytes.Buffer
-	const punchCardWidth = 80
 	doc.ToText(&buf, comment, indent, preIndent, punchCardWidth-2*len(indent))
 	if containsOnlySpace(buf.Bytes()) {
 		return ""
@@ -252,9 +331,9 @@ func comment_textFunc(comment, indent, preIndent string) string {
 	return strings.Join(lines, "\n")
 }
 
-func nodeFunc(info *PackageInfo, node interface{}) string {
+func (p *PackageInfo) nodeFunc(node interface{}) string {
 	var buf bytes.Buffer
-	err := printer.Fprint(&buf, info.FSet, node)
+	err := printer.Fprint(&buf, p.FSet, node)
 	if err != nil {
 		log.Print(err)
 	}
@@ -267,13 +346,13 @@ const tmplPackageText = `// Copyright The Go Authors. All rights reserved.
 
 // +build ingore
 
-{{with .PDocLocal}}{{/* template comments */}}{{/*
+{{with .PDoc}}{{/* template comments */}}{{/*
 
 -------------------------------------------------------------------------------
 -- PACKAGE DOCUMENTATION
 -------------------------------------------------------------------------------
 
-*/}}{{comment_text .Doc "" "\t"}}
+*/}}{{comment_text "" .Doc "" "\t"}}
 package {{.Name}}
 {{/*
 
@@ -282,8 +361,8 @@ package {{.Name}}
 -------------------------------------------------------------------------------
 
 */}}{{with .Consts}}{{range .}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text (index .Names 0) .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
@@ -291,8 +370,8 @@ package {{.Name}}
 -------------------------------------------------------------------------------
 
 */}}{{with .Vars}}{{range .}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text (index .Names 0) .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
@@ -300,17 +379,17 @@ package {{.Name}}
 -------------------------------------------------------------------------------
 
 */}}{{with .Funcs}}{{range .}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text .Name .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
 -- TYPES
 -------------------------------------------------------------------------------
 
-*/}}{{with .Types}}{{range .}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+*/}}{{with .Types}}{{range .}}{{$typeName := .Name}}
+{{comment_text .Name .Doc "" "\t"}}
+{{node .Decl}}
 {{/*
 
 -------------------------------------------------------------------------------
@@ -318,8 +397,8 @@ package {{.Name}}
 -------------------------------------------------------------------------------
 
 */}}{{if .Consts}}{{range .Consts}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text (index .Names 0) .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
@@ -327,8 +406,8 @@ package {{.Name}}
 -------------------------------------------------------------------------------
 
 */}}{{if .Vars}}{{range .Vars}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text (index .Names 0) .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
@@ -336,8 +415,8 @@ package {{.Name}}
 -------------------------------------------------------------------------------
 
 */}}{{if .Funcs}}{{range .Funcs}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text .Name .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
@@ -345,8 +424,8 @@ TYPES.METHODS
 -------------------------------------------------------------------------------
 
 */}}{{if .Methods}}{{range .Methods}}
-{{comment_text .Doc "" "\t"}}
-{{node $ .Decl}}
+{{comment_text (printf "%s.%s" $typeName .Name) .Doc "" "\t"}}
+{{node .Decl}}
 {{end}}{{end}}{{/*
 
 -------------------------------------------------------------------------------
