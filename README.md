@@ -12,6 +12,7 @@ Start Chinese Godoc Server:
 See:
 
 - http://github.com/chai2010/golangdoc.translations
+- http://godoc.org/github.com/chai2010/golangdoc/docgen
 - http://godoc.org/github.com/chai2010/golangdoc/local
 
 

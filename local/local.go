@@ -179,7 +179,7 @@ func trPackage(lang, importPath string, pkg *doc.Package) *doc.Package {
 	key := mapKey(lang, pkg.ImportPath, __pkg__)
 	localPkg, _ := pkgDocTable[key]
 	if localPkg == nil {
-		return pkg
+		return nil
 	}
 
 	pkg.Name = localPkg.Name
