@@ -49,6 +49,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strings"
 	"text/template"
 	"unicode"
@@ -147,6 +148,19 @@ func listPackages(name string) (pkgs []string) {
 			pkgs = append(pkgs, s)
 		}
 	}
+	if name == "std" {
+		hasBuiltin := false
+		for _, s := range pkgs {
+			if s == "builtin" {
+				hasBuiltin = true
+				break
+			}
+		}
+		if !hasBuiltin {
+			pkgs = append(pkgs, "builtin")
+		}
+	}
+	sort.Strings(pkgs)
 	return
 }
 
@@ -311,33 +325,38 @@ func (p *PackageInfo) Bytes() []byte {
 }
 
 func (p *PackageInfo) comment_textFunc(id, comment, indent, preIndent string) string {
-	if id == "" {
-		docOrigin := p.comment_format(p.PDoc.Doc, indent, preIndent, 80)
-		docLocal := docOrigin
-		if p.PDocLocal != nil {
-			docLocal = p.comment_format(p.PDocLocal.Doc, indent, preIndent, 40)
-		}
-		return docOrigin + "\n\n" + docLocal
+	localDoc := p.getLocalDoc(id)
+	comment1 := p.comment_format(comment, indent, preIndent)
+	if localDoc == "" || localDoc == comment {
+		return comment1
+	}
+	comment2 := p.comment_format(localDoc, indent, preIndent)
+	if comment1 == comment2 {
+		return comment1
+	}
+	return comment1 + "\n\n" + comment2
+}
+
+func (p *PackageInfo) getLocalDoc(id string) string {
+	if p.PDocLocal == nil {
+		return ""
+	}
+	if id != "" {
+		s, _ := p.PDocMap[p.mapKey(p.Lang, p.PDoc.ImportPath, id)]
+		return s
 	} else {
-		docOriginComment, _ := p.PDocMap[p.mapKey("", p.PDoc.ImportPath, id)]
-		docOrigin := p.comment_format(docOriginComment, indent, preIndent, 80)
-		docLocalComment := docOriginComment
-		docLocal := docOrigin
-		if p.PDocLocal != nil {
-			docLocalComment, _ = p.PDocMap[p.mapKey(p.Lang, p.PDocLocal.ImportPath, id)]
-			docLocal = p.comment_format(docLocalComment, indent, preIndent, 40)
-		}
-		return docOrigin + "\n\n" + docLocal
+		return p.PDocLocal.Doc
 	}
 }
 
-func (p *PackageInfo) comment_format(comment, indent, preIndent string, punchCardWidth int) string {
+func (p *PackageInfo) comment_format(comment, indent, preIndent string) string {
 	containsOnlySpace := func(buf []byte) bool {
 		isNotSpace := func(r rune) bool { return !unicode.IsSpace(r) }
 		return bytes.IndexFunc(buf, isNotSpace) == -1
 	}
 	var buf bytes.Buffer
-	doc.ToText(&buf, comment, indent, preIndent, punchCardWidth-2*len(indent))
+	const punchCardWidth = 80
+	ToText(&buf, comment, indent, preIndent, punchCardWidth-2*len(indent))
 	if containsOnlySpace(buf.Bytes()) {
 		return ""
 	}

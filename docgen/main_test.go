@@ -6,16 +6,6 @@ package main
 
 import (
 	"testing"
-	"text/template"
-)
-
-var testDocTemplate = template.Must(
-	template.New("doc").Funcs(template.FuncMap{
-		"comment_text": comment_textFunc,
-		"node":         nodeFunc,
-	}).Parse(
-		tmplPackageText,
-	),
 )
 
 func TestDocgen(t *testing.T) {
