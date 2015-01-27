@@ -55,6 +55,9 @@ func (s *handlerServer) registerWithMux(mux *http.ServeMux) {
 // set to the respective error but the error is not logged.
 //
 func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode) *PageInfo {
+	if strings.HasPrefix(abspath, "/src/cmd/") && !strings.HasPrefix(relpath, "cmd/") {
+		relpath = "cmd/" + relpath
+	}
 	info := &PageInfo{Dirname: abspath}
 
 	// Restrict to the package files that would be used when building
