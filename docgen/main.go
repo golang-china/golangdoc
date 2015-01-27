@@ -49,6 +49,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"text/template"
@@ -187,6 +188,9 @@ func docgen(name, lang string) (importPath string, err error) {
 
 func docFilename(importPath, lang string) string {
 	const base = "translations/src"
+	if importPath == "syscall" && flagGOOS == "" {
+		flagGOOS = runtime.GOOS
+	}
 	var filename string
 	switch {
 	case flagGOOS != "" && flagGOARCH != "":
