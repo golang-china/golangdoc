@@ -6,6 +6,7 @@ package local
 
 import (
 	"archive/zip"
+	"go/build"
 	"log"
 	"os"
 	"path/filepath"
@@ -59,11 +60,13 @@ func Init(goRoot, goZipFile, goTemplateDir, goPath string) {
 
 		defaultRootFS = getNameSpace(zipfs.New(rc, goZipFile), goRoot)
 		defaultDocFS = getNameSpace(defaultRootFS, "/doc")
+		defaultBlogFS = getNameSpace(defaultRootFS, "/blog")
 		defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
 	} else {
 		if goRoot != "" && goRoot != runtime.GOROOT() {
 			defaultRootFS = getNameSpace(vfs.OS(goRoot), "/")
 			defaultDocFS = getNameSpace(defaultRootFS, "/doc")
+			defaultBlogFS = getNameSpace(defaultRootFS, "/blog")
 			defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
 		}
 	}
@@ -75,6 +78,14 @@ func Init(goRoot, goZipFile, goTemplateDir, goPath string) {
 	// Bind $GOPATH trees into Go root.
 	for _, p := range filepath.SplitList(goPath) {
 		defaultRootFS.Bind("/src", vfs.OS(p), "/src", vfs.BindAfter)
+	}
+
+	// Prefer content from go.blog repository if present.
+	if _, err := defaultBlogFS.Lstat("/"); err != nil {
+		const blogRepo = "golang.org/x/blog"
+		if pkg, err := build.Import(blogRepo, "", build.FindOnly); err == nil {
+			defaultBlogFS = getNameSpace(defaultRootFS, pkg.Dir)
+		}
 	}
 }
 

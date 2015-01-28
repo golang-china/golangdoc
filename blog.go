@@ -6,18 +6,16 @@ package main
 
 import (
 	"fmt"
-	"go/build"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
 	"golang.org/x/tools/godoc/redirect"
 
 	"github.com/chai2010/golangdoc/blog"
+	"github.com/chai2010/golangdoc/local"
 )
 
 const (
@@ -41,16 +39,10 @@ func init() {
 }
 
 func blogInit() {
-	// Binary distributions will include the blog content in "/blog".
-	root := filepath.Join(runtime.GOROOT(), "blog")
-
-	// Prefer content from go.blog repository if present.
-	if pkg, err := build.Import(blogRepo, "", build.FindOnly); err == nil {
-		root = pkg.Dir
-	}
+	blogFS := local.BlogFS(*lang)
 
 	// If content is not available fall back to redirect.
-	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
+	if fi, err := blogFS.Lstat("/"); err != nil || !fi.IsDir() {
 		fmt.Fprintf(os.Stderr, "Blog content not available locally. "+
 			"To install, run \n\tgo get %v\n", blogRepo)
 		blogServer = http.HandlerFunc(blogRedirectHandler)
@@ -58,10 +50,11 @@ func blogInit() {
 	}
 
 	s, err := blog.NewServer(blog.Config{
+		RootFS:       blogFS,
 		BaseURL:      blogPath,
 		BasePath:     strings.TrimSuffix(blogPath, "/"),
-		ContentPath:  filepath.Join(root, "content"),
-		TemplatePath: filepath.Join(root, "template"),
+		ContentPath:  "content",
+		TemplatePath: "template",
 		HomeArticles: 5,
 		PlayEnabled:  playEnabled,
 	})
