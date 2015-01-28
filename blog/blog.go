@@ -21,6 +21,8 @@ import (
 	"time"
 
 	"golang.org/x/tools/blog/atom"
+	"golang.org/x/tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs/httpfs"
 	"golang.org/x/tools/present"
 )
 
@@ -28,6 +30,7 @@ var validJSONPFunc = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_.]*$`)
 
 // Config specifies Server configuration values.
 type Config struct {
+	RootFS       vfs.FileSystem
 	ContentPath  string // Relative or absolute location of article files and related content.
 	TemplatePath string // Relative or absolute location of template files.
 
@@ -73,36 +76,47 @@ type Server struct {
 func NewServer(cfg Config) (*Server, error) {
 	present.PlayEnabled = cfg.PlayEnabled
 
-	root := filepath.Join(cfg.TemplatePath, "root.tmpl")
-	parse := func(name string) (*template.Template, error) {
-		t := template.New("").Funcs(funcMap)
-		return t.ParseFiles(root, filepath.Join(cfg.TemplatePath, name))
+	parse := func(fs vfs.FileSystem, t *template.Template, filenames ...string) (*template.Template, error) {
+		if t == nil {
+			t = template.New(filenames[0]).Funcs(funcMap)
+		} else {
+			t = t.Funcs(funcMap)
+		}
+		for _, name := range filenames {
+			data, err := vfs.ReadFile(fs, filepath.Join(cfg.TemplatePath, name))
+			if err != nil {
+				return nil, err
+			}
+			if _, err := t.Parse(string(data)); err != nil {
+				return nil, err
+			}
+		}
+		return t, nil
 	}
 
 	s := &Server{cfg: cfg}
 
 	// Parse templates.
 	var err error
-	s.template.home, err = parse("home.tmpl")
+	s.template.home, err = parse(s.cfg.RootFS, nil, "root.tmpl", "home.tmpl")
 	if err != nil {
 		return nil, err
 	}
-	s.template.index, err = parse("index.tmpl")
+	s.template.index, err = parse(s.cfg.RootFS, nil, "root.tmpl", "index.tmpl")
 	if err != nil {
 		return nil, err
 	}
-	s.template.article, err = parse("article.tmpl")
+	s.template.article, err = parse(s.cfg.RootFS, nil, "root.tmpl", "article.tmpl")
 	if err != nil {
 		return nil, err
 	}
-	p := present.Template().Funcs(funcMap)
-	s.template.doc, err = p.ParseFiles(filepath.Join(cfg.TemplatePath, "doc.tmpl"))
+	s.template.doc, err = parse(s.cfg.RootFS, present.Template(), "doc.tmpl")
 	if err != nil {
 		return nil, err
 	}
 
 	// Load content.
-	err = s.loadDocs(filepath.Clean(cfg.ContentPath))
+	err = s.loadDocs(s.cfg.ContentPath)
 	if err != nil {
 		return nil, err
 	}
@@ -118,9 +132,21 @@ func NewServer(cfg Config) (*Server, error) {
 	}
 
 	// Set up content file server.
-	s.content = http.StripPrefix(s.cfg.BasePath, http.FileServer(http.Dir(cfg.ContentPath)))
+	s.content = http.StripPrefix(s.cfg.BasePath, http.FileServer(
+		httpfs.New(getNameSpace(s.cfg.RootFS, s.cfg.ContentPath)),
+	))
 
 	return s, nil
+}
+
+func getNameSpace(fs vfs.FileSystem, ns string) vfs.NameSpace {
+	newns := make(vfs.NameSpace)
+	if ns != "" {
+		newns.Bind("/", fs, ns, vfs.BindReplace)
+	} else {
+		newns.Bind("/", fs, "/", vfs.BindReplace)
+	}
+	return newns
 }
 
 var funcMap = template.FuncMap{
@@ -171,16 +197,21 @@ func authorName(a present.Author) string {
 func (s *Server) loadDocs(root string) error {
 	// Read content into docs field.
 	const ext = ".article"
-	fn := func(p string, info os.FileInfo, err error) error {
+	fn := func(fs vfs.FileSystem, p string, info os.FileInfo, err error) error {
 		if filepath.Ext(p) != ext {
 			return nil
 		}
-		f, err := os.Open(p)
+		f, err := fs.Open(p)
 		if err != nil {
 			return err
 		}
 		defer f.Close()
-		d, err := present.Parse(f, p, 0)
+		ctx := &present.Context{
+			ReadFile: func(filename string) ([]byte, error) {
+				return vfs.ReadFile(s.cfg.RootFS, filename)
+			},
+		}
+		d, err := ctx.Parse(f, p, 0)
 		if err != nil {
 			return err
 		}
@@ -199,7 +230,7 @@ func (s *Server) loadDocs(root string) error {
 		})
 		return nil
 	}
-	err := filepath.Walk(root, fn)
+	err := Walk(s.cfg.RootFS, root, fn)
 	if err != nil {
 		return err
 	}

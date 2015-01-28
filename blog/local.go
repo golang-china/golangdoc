@@ -13,6 +13,7 @@ import (
 	"runtime"
 
 	"golang.org/x/tools/godoc/static"
+	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/httpfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 
@@ -25,8 +26,9 @@ const (
 
 var cfg = blog.Config{
 	Hostname:     hostname,
-	ContentPath:  path.Join(runtime.GOROOT(), `/translations/blog/zh_CN/content`),
-	TemplatePath: path.Join(runtime.GOROOT(), `/translations/blog/zh_CN/template`),
+	RootFS:       vfs.OS(path.Join(runtime.GOROOT(), `/translations/blog/zh_CN`)),
+	ContentPath:  "content",
+	TemplatePath: "template",
 	BaseURL:      "//" + hostname,
 	GodocURL:     "//golang.org",
 	HomeArticles: 5,  // articles to display on the home page
