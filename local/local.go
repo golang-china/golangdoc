@@ -22,11 +22,13 @@ type Translater interface {
 	Static(lang string) vfs.FileSystem
 	Document(lang string) vfs.FileSystem
 	Package(lang, importPath string, pkg ...*doc.Package) *doc.Package
+	Blog(lang string) vfs.FileSystem
 }
 
 var (
 	staticFSTable    = make(map[string]vfs.FileSystem) // map[lang]...
 	docFSTable       = make(map[string]vfs.FileSystem) // map[lang]...
+	blogFSTable      = make(map[string]vfs.FileSystem) // map[lang]...
 	pkgDocTable      = make(map[string]*doc.Package)   // map[mapKey(...)]...
 	pkgDocIndexTable = make(map[string]string)         // map[mapKey(...)]...
 	trList           = make([]Translater, 0)
@@ -48,6 +50,11 @@ func RegisterStaticFS(lang string, staticFiles vfs.FileSystem) {
 // RegisterDocumentFS Register DocumentFS.
 func RegisterDocumentFS(lang string, docFiles vfs.FileSystem) {
 	docFSTable[lang] = docFiles
+}
+
+// RegisterBlogFS Register BlogFS.
+func RegisterBlogFS(lang string, blogFiles vfs.FileSystem) {
+	blogFSTable[lang] = blogFiles
 }
 
 // RegisterPackage Register Package.
@@ -134,6 +141,25 @@ func Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
 		return pkg[0]
 	}
 	return nil
+}
+
+// BlogFS return Blog filesystem.
+func BlogFS(lang string) vfs.FileSystem {
+	if lang == "" {
+		return defaultBlogFS
+	}
+	if fs, _ := blogFSTable[lang]; fs != nil {
+		return fs
+	}
+	for _, tr := range trList {
+		if fs := tr.Blog(lang); fs != nil {
+			return fs
+		}
+	}
+	if fs := defaultTranslater.Blog(lang); fs != nil {
+		return fs
+	}
+	return defaultBlogFS
 }
 
 func initDocTable(lang string, pkg *doc.Package) {

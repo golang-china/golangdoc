@@ -51,6 +51,13 @@ func (p *localTranslater) Package(lang, importPath string, pkg ...*doc.Package) 
 	return Package(lang, importPath, pkg...)
 }
 
+func (p *localTranslater) Blog(lang string) vfs.FileSystem {
+	if lang == "" {
+		return defaultBlogFS
+	}
+	return p.NameSpace("/blog/" + lang)
+}
+
 func (p *localTranslater) ParseDocPackage(lang, importPath string) *doc.Package {
 	if lang == "" || importPath == "" || importPath[0] == '/' {
 		return nil

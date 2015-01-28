@@ -29,6 +29,7 @@ var (
 	defaultRootFS      vfs.NameSpace = getNameSpace(vfs.OS(runtime.GOROOT()), "/")
 	defaultStaticFS    vfs.NameSpace = getNameSpace(mapfs.New(static.Files), "/")
 	defaultDocFS       vfs.NameSpace = getNameSpace(defaultRootFS, "/doc")
+	defaultBlogFS      vfs.NameSpace = getNameSpace(defaultRootFS, "/blog")
 	defaultLocalFS     vfs.NameSpace = getNameSpace(defaultRootFS, "/"+Default)
 	defaultTranslater  Translater    = new(localTranslater)
 )
