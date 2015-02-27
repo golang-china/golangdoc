@@ -46,8 +46,8 @@ import (
 	"golang.org/x/tools/godoc/analysis"
 	"golang.org/x/tools/godoc/vfs"
 
-	"github.com/chai2010/golangdoc/godoc"
-	"github.com/chai2010/golangdoc/local"
+	"github.com/golang-china/golangdoc/godoc"
+	"github.com/golang-china/golangdoc/local"
 )
 
 const (

@@ -14,8 +14,8 @@ import (
 
 	"golang.org/x/tools/godoc/redirect"
 
-	"github.com/chai2010/golangdoc/blog"
-	"github.com/chai2010/golangdoc/local"
+	"github.com/golang-china/golangdoc/blog"
+	"github.com/golang-china/golangdoc/local"
 )
 
 const (

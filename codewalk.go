@@ -31,7 +31,7 @@ import (
 
 	"golang.org/x/tools/godoc/vfs"
 
-	"github.com/chai2010/golangdoc/godoc"
+	"github.com/golang-china/golangdoc/godoc"
 )
 
 var codewalkHTML, codewalkdirHTML *template.Template
