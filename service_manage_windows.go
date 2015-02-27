@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/winsvc/eventlog"
-	"code.google.com/p/winsvc/mgr"
-	"code.google.com/p/winsvc/svc"
-	"code.google.com/p/winsvc/winapi"
+	"github.com/golang-china/golangdoc/internal/winsvc/eventlog"
+	"github.com/golang-china/golangdoc/internal/winsvc/mgr"
+	"github.com/golang-china/golangdoc/internal/winsvc/svc"
+	"github.com/golang-china/golangdoc/internal/winsvc/winapi"
 )
 
 func installService(name, desc string, args ...string) error {

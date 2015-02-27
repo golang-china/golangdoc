@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"code.google.com/p/winsvc/svc"
+	"github.com/golang-china/golangdoc/internal/winsvc/svc"
 )
 
 const (
