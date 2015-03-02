@@ -140,9 +140,9 @@ func parseCmdArgs() {
 }
 
 func listPackages(name string) (pkgs []string) {
-	listOut, err := exec.Command(`go`, `list`, name).Output()
+	listOut, err := exec.Command(`go`, `list`, name).CombinedOutput()
 	if err != nil {
-		log.Fatalf("listPackages: err = %v", err)
+		log.Fatalf("listPackages: err = %s", listOut)
 	}
 	for _, line := range strings.Split(string(listOut), "\n") {
 		if s := strings.TrimSpace(line); s != "" {
