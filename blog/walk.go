@@ -53,7 +53,7 @@ func walk(fs vfs.FileSystem, path string, info os.FileInfo, walkFn WalkFunc) err
 	}
 
 	for _, name := range names {
-		filename := filepath.Join(path, name)
+		filename := filepath.ToSlash(filepath.Join(path, name))
 		fileInfo, err := fs.Lstat(filename)
 		if err != nil {
 			if err := walkFn(fs, filename, fileInfo, err); err != nil && err != SkipDir {
@@ -78,6 +78,7 @@ func walk(fs vfs.FileSystem, path string, info os.FileInfo, walkFn WalkFunc) err
 // large directories Walk can be inefficient.
 // Walk does not follow symbolic links.
 func Walk(fs vfs.FileSystem, root string, walkFn WalkFunc) error {
+	root = filepath.ToSlash(root)
 	info, err := fs.Lstat(root)
 	if err != nil {
 		return walkFn(fs, root, nil, err)
@@ -88,6 +89,7 @@ func Walk(fs vfs.FileSystem, root string, walkFn WalkFunc) error {
 // readDirNames reads the directory named by dirname and returns
 // a sorted list of directory entries.
 func readDirNames(fs vfs.FileSystem, dirname string) ([]string, error) {
+	dirname = filepath.ToSlash(dirname)
 	fileInfoList, err := fs.ReadDir(dirname)
 	if err != nil {
 		return nil, err

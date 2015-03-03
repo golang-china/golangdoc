@@ -83,7 +83,7 @@ func NewServer(cfg Config) (*Server, error) {
 			t = t.Funcs(funcMap)
 		}
 		for _, name := range filenames {
-			data, err := vfs.ReadFile(fs, filepath.Join(cfg.TemplatePath, name))
+			data, err := vfs.ReadFile(fs, filepath.ToSlash(filepath.Join(cfg.TemplatePath, name)))
 			if err != nil {
 				return nil, err
 			}
@@ -208,7 +208,7 @@ func (s *Server) loadDocs(root string) error {
 		defer f.Close()
 		ctx := &present.Context{
 			ReadFile: func(filename string) ([]byte, error) {
-				return vfs.ReadFile(s.cfg.RootFS, filename)
+				return vfs.ReadFile(s.cfg.RootFS, filepath.ToSlash(filename))
 			},
 		}
 		d, err := ctx.Parse(f, p, 0)
@@ -224,7 +224,7 @@ func (s *Server) loadDocs(root string) error {
 		p = filepath.ToSlash(p)
 		s.docs = append(s.docs, &Doc{
 			Doc:       d,
-			Path:      s.cfg.BasePath + p,
+			Path:      filepath.ToSlash(s.cfg.BasePath + p),
 			Permalink: s.cfg.BaseURL + p,
 			HTML:      template.HTML(html.String()),
 		})
