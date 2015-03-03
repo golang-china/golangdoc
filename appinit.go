@@ -10,17 +10,14 @@ package main
 // See README.godoc-app for details.
 
 import (
-	"archive/zip"
+	"go/doc"
 	"log"
-	"path"
 	"regexp"
 
-	"golang.org/x/tools/godoc/static"
 	"golang.org/x/tools/godoc/vfs"
-	"golang.org/x/tools/godoc/vfs/mapfs"
-	"golang.org/x/tools/godoc/vfs/zipfs"
 
 	"github.com/golang-china/golangdoc/godoc"
+	"github.com/golang-china/golangdoc/local"
 )
 
 func init() {
@@ -31,27 +28,36 @@ func init() {
 	log.Printf(".zip GOROOT = %s", zipGoroot)
 	log.Printf("index files = %s", indexFilenames)
 
-	goroot := path.Join("/", zipGoroot) // fsHttp paths are relative to '/'
-
-	// read .zip file and set up file systems
-	const zipfile = zipFilename
-	rc, err := zip.OpenReader(zipfile)
-	if err != nil {
-		log.Fatalf("%s: %s\n", zipfile, err)
-	}
-	// rc is never closed (app running forever)
-	fs.Bind("/", zipfs.New(rc, zipFilename), goroot, vfs.BindReplace)
-	fs.Bind("/lib/godoc", mapfs.New(static.Files), "/", vfs.BindReplace)
+	// Determine file system to use.
+	local.Init(zipGoroot, zipFilename, "", "")
+	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
+	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
+	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)
 
 	corpus := godoc.NewCorpus(fs)
 	corpus.Verbose = false
-	corpus.MaxResults = 10000 // matches flag default in main.go
+	corpus.MaxResults = 10000   // matches flag default in main.go
 	corpus.IndexEnabled = true
 	corpus.IndexFiles = indexFilenames
+
+	// translate hook
+	corpus.SummarizePackage = func(importPath string) (summary string, showList, ok bool) {
+		if pkg := local.Package(*lang, importPath); pkg != nil {
+			summary = doc.Synopsis(pkg.Doc)
+		}
+		ok = (summary != "")
+		return
+	}
+	corpus.TranslateDocPackage = func(pkg *doc.Package) *doc.Package {
+		return local.Package(*lang, pkg.ImportPath, pkg)
+	}
+
 	if err := corpus.Init(); err != nil {
 		log.Fatal(err)
 	}
-	go corpus.RunIndexer()
+	if corpus.IndexEnabled && corpus.IndexFiles != "" {
+		go corpus.RunIndexer()
+	}
 
 	pres = godoc.NewPresentation(corpus)
 	pres.TabWidth = 8

@@ -8,7 +8,7 @@ package main
 
 const (
 	// .zip filename
-	zipFilename = "godoc.zip"
+	zipFilename = "goroot.zip"
 
 	// goroot directory in .zip file
 	zipGoroot = "goroot"
