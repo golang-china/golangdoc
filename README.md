@@ -1,38 +1,39 @@
-# Godoc for Golang, support translate.
+# Godoc 改进版本, 支持翻译文档的动态加载
 
-Install golangdoc:
+GAE预览 http://golang-china.appspot.com/
+
+# 安装 golangdoc
+
+安装 golangdoc :
 
 	go get github.com/golang-china/golangdoc
 
-Download Chinese Translate:
+下载翻译文件 到 `$(GOROOT)/translations` 目录:
 
-	git clone https://github.com/golang-china/golangdoc.translations.git $(GOROOT)/translations
+	https://github.com/golang-china/golangdoc.translations
 
-Start Chinese Godoc Server:
+启用简体中文版文档服务:
 
 	golangdoc -http=:6060 -lang=zh_CN
 
-See:
 
-- http://github.com/golang-china/golangdoc.translations
-- http://godoc.org/github.com/golang-china/golangdoc/docgen
-- http://godoc.org/github.com/golang-china/golangdoc/local
+# 支持 Windows 服务模式运行
 
-
-# Run as windows service:
-
-	# install as windows service
+	# 安装 Windows 服务
 	golangdoc -service-install -http=:6060
 
-	# start/stop service
+	# 启动/停止 Windows 服务
 	golangdoc -service-start
 	golangdoc -service-stop
 
-	# remove service
+	# 卸载 Windows 服务
 	golangdoc -service-remove
 
-# BUGS
 
-Report bugs to chaishushan@gmail.com.
+# 其他
 
-Thanks!
+- GAE环境支持: https://github.com/golang-china/golangdoc/tree/master/appengine
+- 文档翻译项目: http://github.com/golang-china/golangdoc.translations
+- 文档提取工具: http://godoc.org/github.com/golang-china/golangdoc/docgen
+- 本地化支持包: http://godoc.org/github.com/golang-china/golangdoc/local
+
