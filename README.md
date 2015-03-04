@@ -16,8 +16,12 @@ GAE预览 http://golang-china.appspot.com/
 
 	golangdoc -http=:6060 -lang=zh_CN
 
+## 部署到 AGE 环境
 
-# 支持 Windows 服务模式运行
+golangdoc 支持 GAE 环境. 具体请参考: [appengine/README.md](appengine/README.md)
+
+
+# 系统服务模式运行(Windows平台)
 
 	# 安装 Windows 服务
 	golangdoc -service-install -http=:6060
