@@ -88,6 +88,12 @@ func isIngoreFile(path string) bool {
 	if strings.HasPrefix(path, "translations/.git") {
 		return true
 	}
+	if strings.HasPrefix(path, "translations/talks") {
+		return true
+	}
+	if strings.HasPrefix(path, "translations/tour") {
+		return true
+	}
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".exe", ".dll":
 		return true
