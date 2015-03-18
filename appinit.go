@@ -24,32 +24,46 @@ func init() {
 	playEnabled = true
 
 	log.Println("initializing godoc ...")
-	log.Printf(".zip file   = %s", zipFilename)
-	log.Printf(".zip GOROOT = %s", zipGoroot)
-	log.Printf("index files = %s", indexFilenames)
+	log.Printf(".zip file   = %s", flagZipFilename)
+	log.Printf(".zip GOROOT = %s", flagZipGoroot)
+	log.Printf("index files = %s", flagIndexFilenames)
 
 	// Determine file system to use.
-	local.Init(zipGoroot, zipFilename, "", "")
+	local.Init(flagZipGoroot, flagZipFilename, "", "")
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
-	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
-	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)
+	fs.Bind("/lib/godoc", local.StaticFS(*flagLang), "/", vfs.BindReplace)
+	fs.Bind("/doc", local.DocumentFS(*flagLang), "/", vfs.BindReplace)
 
 	corpus := godoc.NewCorpus(fs)
 	corpus.Verbose = false
 	corpus.MaxResults = 10000 // matches flag default in main.go
 	corpus.IndexEnabled = true
-	corpus.IndexFiles = indexFilenames
+	corpus.IndexFiles = flagIndexFilenames
 
 	// translate hook
-	corpus.SummarizePackage = func(importPath string) (summary string, showList, ok bool) {
-		if pkg := local.Package(*lang, importPath); pkg != nil {
+	corpus.SummarizePackage = func(importPath string, langs ...string) (summary string, showList, ok bool) {
+		lang := *flagLang
+		if len(langs) > 0 && langs[0] != "" {
+			lang = langs[0]
+		}
+		if lang == "en" || lang == "raw" || lang == "EN" {
+			lang = ""
+		}
+		if pkg := local.Package(lang, importPath); pkg != nil {
 			summary = doc.Synopsis(pkg.Doc)
 		}
 		ok = (summary != "")
 		return
 	}
-	corpus.TranslateDocPackage = func(pkg *doc.Package) *doc.Package {
-		return local.Package(*lang, pkg.ImportPath, pkg)
+	corpus.TranslateDocPackage = func(pkg *doc.Package, langs ...string) *doc.Package {
+		lang := *flagLang
+		if len(langs) > 0 && langs[0] != "" {
+			lang = langs[0]
+		}
+		if lang == "en" || lang == "raw" || lang == "EN" {
+			lang = ""
+		}
+		return local.Package(lang, pkg.ImportPath, pkg)
 	}
 
 	if err := corpus.Init(); err != nil {

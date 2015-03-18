@@ -8,17 +8,17 @@ package main
 
 const (
 	// .zip filename
-	zipFilename = "goroot.zip"
+	flagZipFilename = "goroot.zip"
 
 	// goroot directory in .zip file
-	zipGoroot = "goroot"
+	flagZipGoroot = "goroot"
 
 	// glob pattern describing search index files
 	// (if empty, the index is built at run-time)
-	indexFilenames = ""
+	flagIndexFilenames = ""
 )
 
-var lang = func() *string {
+var flagLang = func() *string {
 	v := "zh_CN"
 	return &v
 }()
