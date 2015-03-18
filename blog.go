@@ -39,7 +39,7 @@ func init() {
 }
 
 func blogInit() {
-	blogFS := local.BlogFS(*lang)
+	blogFS := local.BlogFS(*flagLang)
 
 	// If content is not available fall back to redirect.
 	if fi, err := blogFS.Lstat("/"); err != nil || !fi.IsDir() {

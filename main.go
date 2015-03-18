@@ -58,50 +58,50 @@ const (
 var (
 	// file system to serve
 	// (with e.g.: zip -r go.zip $GOROOT -i \*.go -i \*.html -i \*.css -i \*.js -i \*.txt -i \*.c -i \*.h -i \*.s -i \*.png -i \*.jpg -i \*.sh -i favicon.ico)
-	zipfile = flag.String("zip", "", "zip file providing the file system to serve; disabled if empty")
+	flagZipfile = flag.String("zip", "", "zip file providing the file system to serve; disabled if empty")
 
 	// file-based index
-	writeIndex = flag.Bool("write_index", false, "write index to a file; the file name must be specified with -index_files")
+	flagWriteIndex = flag.Bool("write_index", false, "write index to a file; the file name must be specified with -index_files")
 
-	analysisFlag = flag.String("analysis", "", `comma-separated list of analyses to perform (supported: type, pointer). See http://golang.org/lib/godoc/analysis/help.html`)
+	flagAnalysisFlag = flag.String("analysis", "", `comma-separated list of analyses to perform (supported: type, pointer). See http://golang.org/lib/godoc/analysis/help.html`)
 
 	// network
-	httpAddr   = flag.String("http", "", "HTTP service address (e.g., '"+defaultAddr+"')")
-	serverAddr = flag.String("server", "", "webserver address for command line searches")
+	flagHttpAddr   = flag.String("http", "", "HTTP service address (e.g., '"+defaultAddr+"')")
+	flagServerAddr = flag.String("server", "", "webserver address for command line searches")
 
 	// layout control
-	html    = flag.Bool("html", false, "print HTML in command-line mode")
-	srcMode = flag.Bool("src", false, "print (exported) source in command-line mode")
-	urlFlag = flag.String("url", "", "print HTML for named URL")
+	flagHtml    = flag.Bool("html", false, "print HTML in command-line mode")
+	flagSrcMode = flag.Bool("src", false, "print (exported) source in command-line mode")
+	flagUrlFlag = flag.String("url", "", "print HTML for named URL")
 
 	// command-line searches
-	query = flag.Bool("q", false, "arguments are considered search queries")
+	flagQuery = flag.Bool("q", false, "arguments are considered search queries")
 
-	verbose = flag.Bool("v", false, "verbose mode")
+	flagVerbose = flag.Bool("v", false, "verbose mode")
 
 	// file system roots
 	// TODO(gri) consider the invariant that goroot always end in '/'
-	goroot = flag.String("goroot", runtime.GOROOT(), "Go root directory")
+	flagGoroot = flag.String("goroot", runtime.GOROOT(), "Go root directory")
 
 	// layout control
-	tabWidth       = flag.Int("tabwidth", 4, "tab width")
-	showTimestamps = flag.Bool("timestamps", false, "show timestamps with directory listings")
-	templateDir    = flag.String("templates", "", "directory containing alternate template files")
-	showPlayground = flag.Bool("play", false, "enable playground in web interface")
-	showExamples   = flag.Bool("ex", false, "show examples in command line mode")
-	declLinks      = flag.Bool("links", true, "link identifiers to their declarations")
+	flagTabWidth       = flag.Int("tabwidth", 4, "tab width")
+	flagShowTimestamps = flag.Bool("timestamps", false, "show timestamps with directory listings")
+	flagTemplateDir    = flag.String("templates", "", "directory containing alternate template files")
+	flagShowPlayground = flag.Bool("play", false, "enable playground in web interface")
+	flagShowExamples   = flag.Bool("ex", false, "show examples in command line mode")
+	flagDeclLinks      = flag.Bool("links", true, "link identifiers to their declarations")
 
 	// search index
-	indexEnabled  = flag.Bool("index", false, "enable search index")
-	indexFiles    = flag.String("index_files", "", "glob pattern specifying index files; if not empty, the index is read from these files in sorted order")
-	maxResults    = flag.Int("maxresults", 10000, "maximum number of full text search results shown")
-	indexThrottle = flag.Float64("index_throttle", 0.75, "index throttle value; 0.0 = no time allocated, 1.0 = full throttle")
+	flagIndexEnabled  = flag.Bool("index", false, "enable search index")
+	flagIndexFiles    = flag.String("index_files", "", "glob pattern specifying index files; if not empty, the index is read from these files in sorted order")
+	flagMaxResults    = flag.Int("maxresults", 10000, "maximum number of full text search results shown")
+	flagIndexThrottle = flag.Float64("index_throttle", 0.75, "index throttle value; 0.0 = no time allocated, 1.0 = full throttle")
 
 	// source code notes
-	notesRx = flag.String("notes", "BUG", "regular expression matching note markers to show")
+	flagNotesRx = flag.String("notes", "BUG", "regular expression matching note markers to show")
 
 	// local language
-	lang = flag.String("lang", "", "local language")
+	flagLang = flag.String("lang", "", "local language")
 )
 
 func usage() {
@@ -121,7 +121,7 @@ func loggingHandler(h http.Handler) http.Handler {
 
 func handleURLFlag() {
 	// Try up to 10 fetches, following redirects.
-	urlstr := *urlFlag
+	urlstr := *flagUrlFlag
 	for i := 0; i < 10; i++ {
 		// Prepare request.
 		u, err := url.Parse(urlstr)
@@ -157,16 +157,16 @@ func handleURLFlag() {
 
 func runGodoc() {
 	// Determine file system to use.
-	local.Init(*goroot, *zipfile, *templateDir, build.Default.GOPATH)
+	local.Init(*flagGoroot, *flagZipfile, *flagTemplateDir, build.Default.GOPATH)
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
-	fs.Bind("/lib/godoc", local.StaticFS(*lang), "/", vfs.BindReplace)
-	fs.Bind("/doc", local.DocumentFS(*lang), "/", vfs.BindReplace)
+	fs.Bind("/lib/godoc", local.StaticFS(*flagLang), "/", vfs.BindReplace)
+	fs.Bind("/doc", local.DocumentFS(*flagLang), "/", vfs.BindReplace)
 
-	httpMode := *httpAddr != ""
+	httpMode := *flagHttpAddr != ""
 
 	var typeAnalysis, pointerAnalysis bool
-	if *analysisFlag != "" {
-		for _, a := range strings.Split(*analysisFlag, ",") {
+	if *flagAnalysisFlag != "" {
+		for _, a := range strings.Split(*flagAnalysisFlag, ",") {
 			switch a {
 			case "type":
 				typeAnalysis = true
@@ -182,62 +182,62 @@ func runGodoc() {
 
 	// translate hook
 	corpus.SummarizePackage = func(importPath string) (summary string, showList, ok bool) {
-		if pkg := local.Package(*lang, importPath); pkg != nil {
+		if pkg := local.Package(*flagLang, importPath); pkg != nil {
 			summary = doc.Synopsis(pkg.Doc)
 		}
 		ok = (summary != "")
 		return
 	}
 	corpus.TranslateDocPackage = func(pkg *doc.Package) *doc.Package {
-		return local.Package(*lang, pkg.ImportPath, pkg)
+		return local.Package(*flagLang, pkg.ImportPath, pkg)
 	}
 
-	corpus.Verbose = *verbose
-	corpus.MaxResults = *maxResults
-	corpus.IndexEnabled = *indexEnabled && httpMode
-	if *maxResults == 0 {
+	corpus.Verbose = *flagVerbose
+	corpus.MaxResults = *flagMaxResults
+	corpus.IndexEnabled = *flagIndexEnabled && httpMode
+	if *flagMaxResults == 0 {
 		corpus.IndexFullText = false
 	}
-	corpus.IndexFiles = *indexFiles
-	corpus.IndexThrottle = *indexThrottle
-	if *writeIndex {
+	corpus.IndexFiles = *flagIndexFiles
+	corpus.IndexThrottle = *flagIndexThrottle
+	if *flagWriteIndex {
 		corpus.IndexThrottle = 1.0
 		corpus.IndexEnabled = true
 	}
-	if *writeIndex || httpMode || *urlFlag != "" {
+	if *flagWriteIndex || httpMode || *flagUrlFlag != "" {
 		if err := corpus.Init(); err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	pres = godoc.NewPresentation(corpus)
-	pres.TabWidth = *tabWidth
-	pres.ShowTimestamps = *showTimestamps
-	pres.ShowPlayground = *showPlayground
-	pres.ShowExamples = *showExamples
-	pres.DeclLinks = *declLinks
-	pres.SrcMode = *srcMode
-	pres.HTMLMode = *html
-	if *notesRx != "" {
-		pres.NotesRx = regexp.MustCompile(*notesRx)
+	pres.TabWidth = *flagTabWidth
+	pres.ShowTimestamps = *flagShowTimestamps
+	pres.ShowPlayground = *flagShowPlayground
+	pres.ShowExamples = *flagShowExamples
+	pres.DeclLinks = *flagDeclLinks
+	pres.SrcMode = *flagSrcMode
+	pres.HTMLMode = *flagHtml
+	if *flagNotesRx != "" {
+		pres.NotesRx = regexp.MustCompile(*flagNotesRx)
 	}
 
-	readTemplates(pres, httpMode || *urlFlag != "")
+	readTemplates(pres, httpMode || *flagUrlFlag != "")
 	registerHandlers(pres)
 
-	if *writeIndex {
+	if *flagWriteIndex {
 		// Write search index and exit.
-		if *indexFiles == "" {
+		if *flagIndexFiles == "" {
 			log.Fatal("no index file specified")
 		}
 
 		log.Println("initialize file systems")
-		*verbose = true // want to see what happens
+		*flagVerbose = true // want to see what happens
 
 		corpus.UpdateIndex()
 
-		log.Println("writing index file", *indexFiles)
-		f, err := os.Create(*indexFiles)
+		log.Println("writing index file", *flagIndexFiles)
+		f, err := os.Create(*flagIndexFiles)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -252,7 +252,7 @@ func runGodoc() {
 	}
 
 	// Print content that would be served at the URL *urlFlag.
-	if *urlFlag != "" {
+	if *flagUrlFlag != "" {
 		handleURLFlag()
 		return
 	}
@@ -260,17 +260,17 @@ func runGodoc() {
 	if httpMode {
 		// HTTP server mode.
 		var handler http.Handler = http.DefaultServeMux
-		if *verbose {
+		if *flagVerbose {
 			log.Printf("Go Documentation Server")
 			log.Printf("version = %s", runtime.Version())
-			log.Printf("address = %s", *httpAddr)
-			log.Printf("goroot = %s", *goroot)
-			log.Printf("tabwidth = %d", *tabWidth)
+			log.Printf("address = %s", *flagHttpAddr)
+			log.Printf("goroot = %s", *flagGoroot)
+			log.Printf("tabwidth = %d", *flagTabWidth)
 			switch {
-			case !*indexEnabled:
+			case !*flagIndexEnabled:
 				log.Print("search index disabled")
-			case *maxResults > 0:
-				log.Printf("full text index enabled (maxresults = %d)", *maxResults)
+			case *flagMaxResults > 0:
+				log.Printf("full text index enabled (maxresults = %d)", *flagMaxResults)
 			default:
 				log.Print("identifier search index enabled")
 			}
@@ -278,7 +278,7 @@ func runGodoc() {
 		}
 
 		// Initialize search index.
-		if *indexEnabled {
+		if *flagIndexEnabled {
 			go corpus.RunIndexer()
 		}
 
@@ -288,14 +288,14 @@ func runGodoc() {
 		}
 
 		// Start http server.
-		if err := http.ListenAndServe(*httpAddr, handler); err != nil {
-			log.Fatalf("ListenAndServe %s: %v", *httpAddr, err)
+		if err := http.ListenAndServe(*flagHttpAddr, handler); err != nil {
+			log.Fatalf("ListenAndServe %s: %v", *flagHttpAddr, err)
 		}
 
 		return
 	}
 
-	if *query {
+	if *flagQuery {
 		handleRemoteSearch()
 		return
 	}

@@ -44,9 +44,9 @@ func remoteSearchURL(query string, html bool) string {
 func remoteSearch(query string) (res *http.Response, err error) {
 	// list of addresses to try
 	var addrs []string
-	if *serverAddr != "" {
+	if *flagServerAddr != "" {
 		// explicit server address - only try this one
-		addrs = []string{*serverAddr}
+		addrs = []string{*flagServerAddr}
 	} else {
 		addrs = []string{
 			defaultAddr,
@@ -55,7 +55,7 @@ func remoteSearch(query string) (res *http.Response, err error) {
 	}
 
 	// remote search
-	search := remoteSearchURL(query, *html)
+	search := remoteSearchURL(query, *flagHtml)
 	for _, addr := range addrs {
 		url := "http://" + addr + search
 		res, err = http.Get(url)

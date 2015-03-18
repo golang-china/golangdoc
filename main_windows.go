@@ -46,11 +46,11 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	playEnabled = *showPlayground
+	playEnabled = *flagShowPlayground
 
 	if *flagServiceInstall {
 		var args []string
-		args = append(args, fmt.Sprintf("-goroot=%s", *goroot))
+		args = append(args, fmt.Sprintf("-goroot=%s", *flagGoroot))
 		for i := 1; i < len(os.Args); i++ {
 			if strings.HasPrefix(os.Args[i], "-service-install") {
 				continue
@@ -60,7 +60,7 @@ func main() {
 			}
 			args = append(args, os.Args[i])
 		}
-		if *httpAddr == "" {
+		if *flagHttpAddr == "" {
 			args = append(args, "-http=:6060")
 		}
 		if err := installService(ServiceName, ServiceDesc, args...); err != nil {
@@ -92,7 +92,7 @@ func main() {
 	}
 
 	// Check usage: either server and no args, command line and args, or index creation mode
-	if (*httpAddr != "" || *urlFlag != "") != (flag.NArg() == 0) && !*writeIndex {
+	if (*flagHttpAddr != "" || *flagUrlFlag != "") != (flag.NArg() == 0) && !*flagWriteIndex {
 		usage()
 	}
 
