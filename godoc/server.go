@@ -249,7 +249,7 @@ func (h *handlerServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if relpath == builtinPkgPath {
 		mode = NoFiltering | NoTypeAssoc
 	}
-	info := h.GetPageInfo(abspath, relpath, mode)
+	info := h.GetPageInfo(abspath, relpath, mode, r.FormValue("lang"))
 	if info.Err != nil {
 		log.Print(info.Err)
 		h.p.ServeError(w, r, relpath, info.Err)
