@@ -78,11 +78,11 @@ type Corpus struct {
 	//
 	// If showList is false, the package is hidden from the
 	// package listing.
-	SummarizePackage func(pkg string) (summary string, showList, ok bool)
+	SummarizePackage func(pkg string, lang ...string) (summary string, showList, ok bool)
 
 	// TranslateDocPackage optionally specifies a function to
 	// translate the package document.
-	TranslateDocPackage func(pkg *doc.Package) *doc.Package
+	TranslateDocPackage func(pkg *doc.Package, lang ...string) *doc.Package
 
 	// IndexDirectory optionally specifies a function to determine
 	// whether the provided directory should be indexed.  The dir

@@ -54,7 +54,7 @@ func (s *handlerServer) registerWithMux(mux *http.ServeMux) {
 // directories, PageInfo.Dirs is nil. If an error occurred, PageInfo.Err is
 // set to the respective error but the error is not logged.
 //
-func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode) *PageInfo {
+func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode, lang ...string) *PageInfo {
 	if strings.HasPrefix(abspath, "/src/cmd/") && !strings.HasPrefix(relpath, "cmd/") {
 		relpath = "cmd/" + relpath
 	}
@@ -133,7 +133,7 @@ func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode) 
 			}
 			info.PDoc = doc.New(pkg, pathpkg.Clean(relpath), m) // no trailing '/' in importpath
 			if h.c.TranslateDocPackage != nil {
-				info.PDoc = h.c.TranslateDocPackage(info.PDoc)
+				info.PDoc = h.c.TranslateDocPackage(info.PDoc, lang...)
 			}
 
 			if mode&NoTypeAssoc != 0 {

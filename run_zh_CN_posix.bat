@@ -8,5 +8,5 @@ cd %~dp0
 
 set GOOS="linux"
 set GOPATH=""
-golangdoc.exe -http=:6060 -lang=zh_CN
+golangdoc.exe -http=:6060 -lang=zh_CN -play
 pause

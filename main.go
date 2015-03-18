@@ -181,15 +181,25 @@ func runGodoc() {
 	corpus := godoc.NewCorpus(fs)
 
 	// translate hook
-	corpus.SummarizePackage = func(importPath string) (summary string, showList, ok bool) {
-		if pkg := local.Package(*flagLang, importPath); pkg != nil {
-			summary = doc.Synopsis(pkg.Doc)
+	corpus.SummarizePackage = func(importPath string, lang ...string) (summary string, showList, ok bool) {
+		if len(lang) != 0 {
+			if pkg := local.Package(lang[0], importPath); pkg != nil {
+				summary = doc.Synopsis(pkg.Doc)
+			}
+		} else {
+			if pkg := local.Package(*flagLang, importPath); pkg != nil {
+				summary = doc.Synopsis(pkg.Doc)
+			}
 		}
 		ok = (summary != "")
 		return
 	}
-	corpus.TranslateDocPackage = func(pkg *doc.Package) *doc.Package {
-		return local.Package(*flagLang, pkg.ImportPath, pkg)
+	corpus.TranslateDocPackage = func(pkg *doc.Package, lang ...string) *doc.Package {
+		if len(lang) != 0 {
+			return local.Package(lang[0], pkg.ImportPath, pkg)
+		} else {
+			return local.Package(*flagLang, pkg.ImportPath, pkg)
+		}
 	}
 
 	corpus.Verbose = *flagVerbose
@@ -300,7 +310,7 @@ func runGodoc() {
 		return
 	}
 
-	if err := godoc.CommandLine(os.Stdout, fs, pres, flag.Args()); err != nil {
+	if err := godoc.CommandLine(os.Stdout, fs, pres, flag.Args(), *flagLang); err != nil {
 		log.Print(err)
 	}
 }

@@ -28,7 +28,7 @@ const (
 
 // CommandLine returns godoc results to w.
 // Note that it may add a /target path to fs.
-func CommandLine(w io.Writer, fs vfs.NameSpace, pres *Presentation, args []string) error {
+func CommandLine(w io.Writer, fs vfs.NameSpace, pres *Presentation, args []string, lang ...string) error {
 	path := args[0]
 	srcMode := pres.SrcMode
 	cmdMode := strings.HasPrefix(path, cmdPrefix)
@@ -67,11 +67,11 @@ func CommandLine(w io.Writer, fs vfs.NameSpace, pres *Presentation, args []strin
 	if !filepath.IsAbs(path) {
 		// First try go.tools/cmd.
 		abspath = pathpkg.Join(pres.PkgFSRoot(), toolsPath+path)
-		cinfo = pres.GetCmdPageInfo(abspath, relpath, mode)
+		cinfo = pres.GetCmdPageInfo(abspath, relpath, mode, lang...)
 		if cinfo.IsEmpty() {
 			// Then try $GOROOT/cmd.
 			abspath = pathpkg.Join(pres.CmdFSRoot(), path)
-			cinfo = pres.GetCmdPageInfo(abspath, relpath, mode)
+			cinfo = pres.GetCmdPageInfo(abspath, relpath, mode, lang...)
 		}
 	}
 
