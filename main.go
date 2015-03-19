@@ -82,7 +82,7 @@ var (
 	// file system roots
 	// TODO(gri) consider the invariant that goroot always end in '/'
 	flagGoroot    = flag.String("goroot", runtime.GOROOT(), "Go root directory")
-	flagLocalRoot = flag.String("godoc-local-root", "", "Godoc translates root, default is $(GOROOT)/translates")
+	flagLocalRoot = flag.String("godoc-local-root", "", "Godoc translations root, default is $(GOROOT)/translations")
 
 	// layout control
 	flagTabWidth       = flag.Int("tabwidth", 4, "tab width")

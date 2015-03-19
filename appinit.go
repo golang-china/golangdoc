@@ -29,7 +29,7 @@ func init() {
 	log.Printf("index files = %s", flagIndexFilenames)
 
 	// Determine file system to use.
-	local.Init(flagZipGoroot, flagZipFilename, "", "")
+	local.Init(flagZipGoroot, local.Default, flagZipFilename, "", "")
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
 	fs.Bind("/lib/godoc", local.StaticFS(*flagLang), "/", vfs.BindReplace)
 	fs.Bind("/doc", local.DocumentFS(*flagLang), "/", vfs.BindReplace)
