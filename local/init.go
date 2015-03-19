@@ -50,24 +50,32 @@ func getGodocGoarch() string {
 }
 
 // Init initialize the translations environment.
-func Init(goRoot, goZipFile, goTemplateDir, goPath string) {
+func Init(goRoot, goTranslations, goZipFile, goTemplateDir, goPath string) {
 	if goZipFile != "" {
 		rc, err := zip.OpenReader(goZipFile)
 		if err != nil {
 			log.Fatalf("local: %s: %s\n", goZipFile, err)
 		}
-		//defer rc.Close()
 
 		defaultRootFS = getNameSpace(zipfs.New(rc, goZipFile), goRoot)
 		defaultDocFS = getNameSpace(defaultRootFS, "/doc")
 		defaultBlogFS = getNameSpace(defaultRootFS, "/blog")
-		defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
+		if goTranslations != "" && goTranslations != Default {
+			defaultLocalFS = getNameSpace(defaultRootFS, "/"+goTranslations)
+		} else {
+			defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
+		}
 	} else {
 		if goRoot != "" && goRoot != runtime.GOROOT() {
 			defaultRootFS = getNameSpace(vfs.OS(goRoot), "/")
 			defaultDocFS = getNameSpace(defaultRootFS, "/doc")
 			defaultBlogFS = getNameSpace(defaultRootFS, "/blog")
-			defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
+			if goTranslations == "" || goTranslations == Default {
+				defaultLocalFS = getNameSpace(defaultRootFS, "/"+Default)
+			}
+		}
+		if goTranslations != "" && goTranslations != Default {
+			defaultLocalFS = getNameSpace(vfs.OS(goTranslations), "/")
 		}
 
 		if goTemplateDir != "" {

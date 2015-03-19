@@ -81,7 +81,8 @@ var (
 
 	// file system roots
 	// TODO(gri) consider the invariant that goroot always end in '/'
-	flagGoroot = flag.String("goroot", runtime.GOROOT(), "Go root directory")
+	flagGoroot    = flag.String("goroot", runtime.GOROOT(), "Go root directory")
+	flagLocalRoot = flag.String("godoc-local-root", "", "Godoc translates root, default is $(GOROOT)/translates")
 
 	// layout control
 	flagTabWidth       = flag.Int("tabwidth", 4, "tab width")
@@ -156,8 +157,14 @@ func handleURLFlag() {
 }
 
 func runGodoc() {
+	if *flagLocalRoot == "" {
+		if s := os.Getenv("GODOC_LOCAL_ROOT"); s != "" {
+			*flagLocalRoot = s
+		}
+	}
+
 	// Determine file system to use.
-	local.Init(*flagGoroot, *flagZipfile, *flagTemplateDir, build.Default.GOPATH)
+	local.Init(*flagGoroot, *flagLocalRoot, *flagZipfile, *flagTemplateDir, build.Default.GOPATH)
 	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
 	fs.Bind("/lib/godoc", local.StaticFS(*flagLang), "/", vfs.BindReplace)
 	fs.Bind("/doc", local.DocumentFS(*flagLang), "/", vfs.BindReplace)

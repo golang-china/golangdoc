@@ -15,10 +15,10 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	playEnabled = *showPlayground
+	playEnabled = *flagShowPlayground
 
 	// Check usage: either server and no args, command line and args, or index creation mode
-	if (*httpAddr != "" || *urlFlag != "") != (flag.NArg() == 0) && !*writeIndex {
+	if (*flagHttpAddr != "" || *flagUrlFlag != "") != (flag.NArg() == 0) && !*flagWriteIndex {
 		usage()
 	}
 
