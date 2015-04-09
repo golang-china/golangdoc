@@ -65,7 +65,7 @@ Usage: docgen package lang... [-GOOS=...] [-GOARCH=...]
 Example:
   docgen builtin zh_CN
   docgen unsafe  zh_CN
-  docgen unsafe  zh_CN 
+  docgen unsafe  zh_CN
   docgen syscall zh_CN -GOOS=windows                     # for windows
   docgen syscall zh_CN -GOOS=windows -GOARCH=amd64       # for windows/amd64
   docgen syscall zh_CN                                   # for non windows
@@ -84,7 +84,7 @@ Output:
 
 Help:
   docgen -h
-    
+
 Report bugs to <chaishushan{AT}gmail.com>.
 `
 
