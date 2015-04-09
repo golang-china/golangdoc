@@ -31,7 +31,7 @@ var (
 	defaultStaticFS    vfs.NameSpace = getNameSpace(mapfs.New(static.Files), "/")
 	defaultDocFS       vfs.NameSpace = getNameSpace(defaultRootFS, "/doc")
 	defaultBlogFS      vfs.NameSpace = getNameSpace(defaultRootFS, "/blog")
-	defaultLocalFS     vfs.NameSpace = getNameSpace(defaultRootFS, "/"+Default)
+	defaultLocalFS     vfs.NameSpace = getLocalRootNS(defaultRootFS)
 	defaultTranslater  Translater    = new(localTranslater)
 )
 
@@ -47,6 +47,13 @@ func getGodocGoarch() string {
 		return v
 	}
 	return runtime.GOARCH
+}
+
+func getLocalRootNS(rootfs vfs.NameSpace) vfs.NameSpace {
+	if s := os.Getenv("GODOC_LOCAL_ROOT"); s != "" {
+		return getNameSpace(vfs.OS(s), "/")
+	}
+	return getNameSpace(defaultRootFS, "/"+Default)
 }
 
 // Init initialize the translations environment.
