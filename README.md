@@ -1,6 +1,6 @@
 # Godoc 改进版本, 支持翻译文档的动态加载
 
-GAE预览 http://golang-china.appspot.com/
+GAE预览 https://golang-china.appspot.com/
 
 # 安装 golangdoc
 
