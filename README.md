@@ -18,10 +18,10 @@ GAE预览 https://golang-china.appspot.com/
 
 动态切换包文档:
 
-- http://golang-china.appspot.com/pkg/builtin/
-- http://golang-china.appspot.com/pkg/builtin/?lang=en
-- http://golang-china.appspot.com/pkg/builtin/?lang=raw
-- http://golang-china.appspot.com/pkg/builtin/?lang=zh_CN
+- https://golang-china.appspot.com/pkg/builtin/
+- https://golang-china.appspot.com/pkg/builtin/?lang=en
+- https://golang-china.appspot.com/pkg/builtin/?lang=raw
+- https://golang-china.appspot.com/pkg/builtin/?lang=zh_CN
 
 其中 URL 的 `lang` 参数为 `en`/`raw` 或 无对应语言时 表示使用原始的文档,
 缺少或为空时用 golangdoc 服务器启动时命令行指定的 `lang` 参数.
