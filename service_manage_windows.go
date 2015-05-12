@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-china/golangdoc/internal/winsvc/eventlog"
-	"github.com/golang-china/golangdoc/internal/winsvc/mgr"
-	"github.com/golang-china/golangdoc/internal/winsvc/svc"
-	"github.com/golang-china/golangdoc/internal/winsvc/winapi"
+	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/svc"
+	"golang.org/x/sys/windows/svc/eventlog"
+	"golang.org/x/sys/windows/svc/mgr"
 )
 
 func installService(name, desc string, args ...string) error {
@@ -41,7 +41,7 @@ func installService(name, desc string, args ...string) error {
 	}
 	s, err = m.CreateService(name, exepath, mgr.Config{
 		DisplayName: desc,
-		StartType:   winapi.SERVICE_AUTO_START,
+		StartType:   windows.SERVICE_AUTO_START,
 	})
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func startService(name string) error {
 		return fmt.Errorf("could not access service: %v", err)
 	}
 	defer s.Close()
-	err = s.Start([]string{"p1", "p2", "p3"})
+	err = s.Start("p1", "p2", "p3")
 	if err != nil {
 		return fmt.Errorf("could not start service: %v", err)
 	}
