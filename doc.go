@@ -34,7 +34,7 @@ Run as windows service:
 	golangdoc -service-remove
 
 
-# BUGS
+BUGS
 
 Report bugs to chaishushan@gmail.com.
 

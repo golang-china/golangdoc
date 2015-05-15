@@ -5,207 +5,253 @@
 package local
 
 import (
-	"fmt"
+	"go/build"
 	"go/doc"
+	"log"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 
+	"golang.org/x/tools/godoc/static"
 	"golang.org/x/tools/godoc/vfs"
+	"golang.org/x/tools/godoc/vfs/mapfs"
 )
 
+// Default is the translations dir.
 const (
-	__pkg__  = "__pkg__"
-	__name__ = "__name__"
-	__doc__  = "__doc__"
+	DefaultDir = "translations"     // $(RootFS)/translations
+	DefaultEnv = "GODOC_LOCAL_ROOT" // dir list
 )
-
-// Translater interface.
-type Translater interface {
-	Static(lang string) vfs.FileSystem
-	Document(lang string) vfs.FileSystem
-	Package(lang, importPath string, pkg ...*doc.Package) *doc.Package
-	Blog(lang string) vfs.FileSystem
-}
 
 var (
-	staticFSTable    = make(map[string]vfs.FileSystem) // map[lang]...
-	docFSTable       = make(map[string]vfs.FileSystem) // map[lang]...
-	blogFSTable      = make(map[string]vfs.FileSystem) // map[lang]...
-	pkgDocTable      = make(map[string]*doc.Package)   // map[mapKey(...)]...
-	pkgDocIndexTable = make(map[string]string)         // map[mapKey(...)]...
-	trList           = make([]Translater, 0)
+	defaultGodocGoos   = getGodocGoos()
+	defaultGodocGoarch = getGodocGoarch()
+
+	currentGoroot       string // runtime.GOROOT()
+	currentGopath       string // build.Default.GOPATH
+	currentTranslations string // os.Getenv(DefaultEnv)
 )
 
-func mapKey(lang, importPath, id string) string {
-	return fmt.Sprintf("%s.%s@%s", importPath, id, lang)
+var (
+	gorootFS           vfs.NameSpace
+	gorootFSTable      map[string]vfs.NameSpace // map[lang]...
+	gopkgDocTable      map[string]*doc.Package  // map[mapKey(...)]...
+	gopkgDocIndexTable map[string]string        // map[mapKey(...)]...
+)
+
+var (
+	nilfs = make(vfs.NameSpace)
+)
+
+func init() {
+	buildRootFS(runtime.GOROOT(), build.Default.GOPATH, "")
 }
 
-func methodId(typeName, methodName string) string {
-	return typeName + "." + methodName
+// Init initialize the translations environment.
+func Init(goroot, gopath, translations string) {
+	buildRootFS(goroot, gopath, translations)
 }
 
-// RegisterStaticFS Register StaticFS.
-func RegisterStaticFS(lang string, staticFiles vfs.FileSystem) {
-	staticFSTable[lang] = staticFiles
-}
+func buildRootFS(goroot, gopath, translations string) {
+	if gorootFS != nil && goroot == currentGoroot && gopath == currentGopath && translations == currentTranslations {
+		return
+	}
 
-// RegisterDocumentFS Register DocumentFS.
-func RegisterDocumentFS(lang string, docFiles vfs.FileSystem) {
-	docFSTable[lang] = docFiles
-}
+	currentGoroot = goroot
+	currentGopath = gopath
+	currentTranslations = translations
 
-// RegisterBlogFS Register BlogFS.
-func RegisterBlogFS(lang string, blogFiles vfs.FileSystem) {
-	blogFSTable[lang] = blogFiles
-}
+	gorootFSTable = make(map[string]vfs.NameSpace)
+	gopkgDocTable = make(map[string]*doc.Package)
+	gopkgDocIndexTable = make(map[string]string)
 
-// RegisterPackage Register Package.
-func RegisterPackage(lang string, pkg *doc.Package) {
-	pkgDocTable[mapKey(lang, pkg.ImportPath, __pkg__)] = pkg
-	initDocTable(lang, pkg)
-}
+	var rootfs vfs.NameSpace
+	switch {
+	case strings.HasSuffix(goroot, ".zip"):
+		rootfs = openZipFS(goroot)
+	default:
+		rootfs = getNameSpace(vfs.OS(runtime.GOROOT()), "/")
+	}
 
-// RegisterTranslater Register Translater.
-func RegisterTranslater(tr Translater) {
-	trList = append(trList, tr)
+	// gopath
+	if gopath != "" {
+		for _, p := range filepath.SplitList(gopath) {
+			rootfs.Bind("/src", vfs.OS(p), "/src", vfs.BindAfter)
+		}
+	}
+
+	// translations
+	switch {
+	case translations != "":
+		if strings.HasSuffix(translations, ".zip") {
+			rootfs.Bind("/translations", openZipFS(translations), "/", vfs.BindReplace)
+		} else {
+			rootfs.Bind("/translations", vfs.OS(translations), "/", vfs.BindReplace)
+		}
+	case os.Getenv(DefaultEnv) != "":
+		for _, p := range filepath.SplitList(os.Getenv(DefaultEnv)) {
+			fi, err := os.Lstat(p)
+			if err != nil {
+				log.Fatalf("local: os.Lstat(%q) failed: %s\n", p, err)
+			}
+			if strings.HasSuffix(fi.Name(), ".zip") {
+				rootfs.Bind("/translations", openZipFS(p), "/", vfs.BindAfter)
+			} else {
+				rootfs.Bind("/translations", vfs.OS(p), "/", vfs.BindAfter)
+			}
+		}
+	default:
+		// default is `$(RootFS)/translations`
+	}
+	if _, err := rootfs.Lstat("/translations/src"); err == nil {
+		rootfs.Bind("/src", rootfs, "/translations/src", vfs.BindAfter)
+	}
+
+	// lib/godoc
+	if _, err := rootfs.Lstat("/lib/godoc"); err != nil {
+		rootfs.Bind("/lib/godoc", mapfs.New(static.Files), "/", vfs.BindAfter)
+	}
+
+	// blog
+	if _, err := rootfs.Lstat("/blog"); err != nil {
+		const blogPath = "/src/golang.org/x/blog"
+		if _, err := rootfs.Lstat(blogPath); err != nil {
+			rootfs.Bind("/blog/static", getNameSpace(rootfs, blogPath), "/static", vfs.BindReplace)
+			rootfs.Bind("/blog/template", getNameSpace(rootfs, blogPath), "/template", vfs.BindReplace)
+			rootfs.Bind("/blog/content", getNameSpace(rootfs, blogPath), "/content", vfs.BindReplace)
+		}
+	}
+
+	// talks
+	if _, err := rootfs.Lstat("/talks"); err != nil {
+		const presentPath = "/src/golang.org/x/tools/cmd/present"
+		if _, err := rootfs.Lstat(presentPath); err != nil {
+			rootfs.Bind("/talks/static", getNameSpace(rootfs, presentPath), "/static", vfs.BindReplace)
+			rootfs.Bind("/talks/template", getNameSpace(rootfs, presentPath), "/template", vfs.BindReplace)
+		}
+		const talksPath = "golang.org/x/talks"
+		if _, err := rootfs.Lstat("/src/" + talksPath); err != nil {
+			rootfs.Bind("/talks/content", getNameSpace(rootfs, talksPath), talksPath, vfs.BindReplace)
+		}
+	}
+
+	// tour
+	if _, err := rootfs.Lstat("/tour"); err != nil {
+		const tourPath = "golang.org/x/tour"
+		if _, err := rootfs.Lstat(tourPath); err != nil {
+			rootfs.Bind("/tour/static", getNameSpace(rootfs, tourPath), tourPath+"/static", vfs.BindReplace)
+			rootfs.Bind("/tour/template", getNameSpace(rootfs, tourPath), tourPath+"/template", vfs.BindReplace)
+			rootfs.Bind("/tour/content", getNameSpace(rootfs, tourPath), tourPath+"/content", vfs.BindReplace)
+		}
+	}
+
+	gorootFS = rootfs
+	return
 }
 
 // RootFS return root filesystem.
-func RootFS() vfs.FileSystem {
-	return defaultRootFS
-}
-
-// StaticFS return Static filesystem.
-func StaticFS(lang string) vfs.FileSystem {
+func RootFS(lang string) vfs.NameSpace {
 	if lang == "" {
-		return defaultStaticFS
+		return gorootFS
 	}
-	if fs, _ := staticFSTable[lang]; fs != nil {
+	if fs, _ := gorootFSTable[lang]; fs != nil {
 		return fs
 	}
-	for _, tr := range trList {
-		if fs := tr.Static(lang); fs != nil {
-			return fs
+
+	newfs := getNameSpace(gorootFS, "/")
+	{
+		// lib/godoc
+		if _, err := gorootFS.Lstat("/translations/static/" + lang); err == nil {
+			newfs.Bind("/lib/godoc", gorootFS, "/translations/static/"+lang, vfs.BindReplace)
+		}
+
+		// doc
+		if _, err := gorootFS.Lstat("/translations/doc/" + lang); err == nil {
+			newfs.Bind("/doc", gorootFS, "/translations/doc/"+lang, vfs.BindReplace)
+		}
+
+		// blog
+		if _, err := gorootFS.Lstat("/translations/blog/" + lang); err == nil {
+			newfs.Bind("/blog", gorootFS, "/translations/blog/"+lang, vfs.BindReplace)
+		}
+
+		// talks
+		if _, err := gorootFS.Lstat("/translations/talks/" + lang); err == nil {
+			newfs.Bind("/talks", gorootFS, "/translations/talks/"+lang, vfs.BindReplace)
+		}
+
+		// tour
+		if _, err := gorootFS.Lstat("/translations/tour/" + lang); err == nil {
+			newfs.Bind("/tour", gorootFS, "/translations/tour/"+lang, vfs.BindReplace)
 		}
 	}
-	if fs := defaultTranslater.Static(lang); fs != nil {
-		return fs
-	}
-	return defaultStaticFS
-}
 
-// DocumentFS return Document filesystem.
-func DocumentFS(lang string) vfs.FileSystem {
-	if lang == "" {
-		return defaultDocFS
-	}
-	if fs, _ := docFSTable[lang]; fs != nil {
-		return fs
-	}
-	for _, tr := range trList {
-		if fs := tr.Document(lang); fs != nil {
-			return fs
-		}
-	}
-	if fs := defaultTranslater.Document(lang); fs != nil {
-		return fs
-	}
-	return defaultDocFS
+	gorootFSTable[lang] = newfs
+	return newfs
 }
 
 // Package translate Package doc.
-func Package(lang, importPath string, pkg ...*doc.Package) *doc.Package {
-	if lang == "" {
-		if len(pkg) > 0 {
-			return pkg[0]
-		} else {
-			return nil
-		}
-	}
-	if len(pkg) > 0 && pkg[0] != nil {
-		if p := trPackage(lang, pkg[0].ImportPath, pkg[0]); p != nil {
-			return p
-		}
-	} else {
-		if p, _ := pkgDocTable[mapKey(lang, importPath, __pkg__)]; p != nil {
-			return p
-		}
-	}
-	for _, tr := range trList {
-		if p := tr.Package(lang, importPath, pkg...); p != nil {
-			return p
-		}
-	}
-	if fs := defaultTranslater.Package(lang, importPath, pkg...); fs != nil {
-		return fs
-	}
-	if len(pkg) > 0 {
-		return pkg[0]
-	}
-	return nil
-}
+func Package(lang, importPath string, in *doc.Package) *doc.Package {
+	key := mapKey(lang, importPath, __pkg__)
 
-// BlogFS return Blog filesystem.
-func BlogFS(lang string) vfs.FileSystem {
-	if lang == "" {
-		return defaultBlogFS
-	}
-	if fs, _ := blogFSTable[lang]; fs != nil {
-		return fs
-	}
-	for _, tr := range trList {
-		if fs := tr.Blog(lang); fs != nil {
-			return fs
+	// build package doc
+	if _, ok := gopkgDocTable[key]; !ok {
+		pkg := parsePkgDocPackage(RootFS(lang), lang, importPath)
+		gopkgDocTable[key] = pkg
+		if pkg == nil {
+			return in
 		}
-	}
-	if fs := defaultTranslater.Blog(lang); fs != nil {
-		return fs
-	}
-	return defaultBlogFS
-}
 
-func initDocTable(lang string, pkg *doc.Package) {
-	pkgDocIndexTable[mapKey(lang, pkg.ImportPath, __name__)] = pkg.Name
-	pkgDocIndexTable[mapKey(lang, pkg.ImportPath, __doc__)] = pkg.Doc
+		gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, __name__)] = pkg.Name
+		gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, __doc__)] = pkg.Doc
 
-	for _, v := range pkg.Consts {
-		for _, id := range v.Names {
-			pkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = v.Doc
-		}
-	}
-	for _, v := range pkg.Types {
-		pkgDocIndexTable[mapKey(lang, pkg.ImportPath, v.Name)] = v.Doc
-
-		for _, x := range v.Consts {
-			for _, id := range x.Names {
-				pkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = x.Doc
+		for _, v := range pkg.Consts {
+			for _, id := range v.Names {
+				gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = v.Doc
 			}
 		}
-		for _, x := range v.Vars {
-			for _, id := range x.Names {
-				pkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = x.Doc
+		for _, v := range pkg.Types {
+			gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, v.Name)] = v.Doc
+
+			for _, x := range v.Consts {
+				for _, id := range x.Names {
+					gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = x.Doc
+				}
+			}
+			for _, x := range v.Vars {
+				for _, id := range x.Names {
+					gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = x.Doc
+				}
+			}
+			for _, x := range v.Funcs {
+				gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, x.Name)] = x.Doc
+			}
+			for _, x := range v.Methods {
+				gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, methodId(v.Name, x.Name))] = x.Doc
 			}
 		}
-		for _, x := range v.Funcs {
-			pkgDocIndexTable[mapKey(lang, pkg.ImportPath, x.Name)] = x.Doc
+		for _, v := range pkg.Vars {
+			for _, id := range v.Names {
+				gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = v.Doc
+			}
 		}
-		for _, x := range v.Methods {
-			pkgDocIndexTable[mapKey(lang, pkg.ImportPath, methodId(v.Name, x.Name))] = x.Doc
-		}
-	}
-	for _, v := range pkg.Vars {
-		for _, id := range v.Names {
-			pkgDocIndexTable[mapKey(lang, pkg.ImportPath, id)] = v.Doc
+		for _, v := range pkg.Funcs {
+			gopkgDocIndexTable[mapKey(lang, pkg.ImportPath, v.Name)] = v.Doc
 		}
 	}
-	for _, v := range pkg.Funcs {
-		pkgDocIndexTable[mapKey(lang, pkg.ImportPath, v.Name)] = v.Doc
-	}
+
+	return trPackage(lang, importPath, in)
 }
 
 func trPackage(lang, importPath string, pkg *doc.Package) *doc.Package {
-	key := mapKey(lang, pkg.ImportPath, __pkg__)
-	localPkg, _ := pkgDocTable[key]
+	key := mapKey(lang, importPath, __pkg__)
+	localPkg, _ := gopkgDocTable[key]
 	if localPkg == nil {
-		return nil
+		return pkg
+	}
+	if pkg == nil {
+		return localPkg
 	}
 
 	pkg.Name = localPkg.Name
@@ -219,51 +265,51 @@ func trPackage(lang, importPath string, pkg *doc.Package) *doc.Package {
 
 	for i := 0; i < len(pkg.Consts); i++ {
 		key := mapKey(lang, pkg.ImportPath, pkg.Consts[i].Names[0])
-		if s, _ := pkgDocIndexTable[key]; s != "" {
+		if s, _ := gopkgDocIndexTable[key]; s != "" {
 			pkg.Consts[i].Doc = s
 		}
 	}
 	for i := 0; i < len(pkg.Types); i++ {
 		key := mapKey(lang, pkg.ImportPath, pkg.Types[i].Name)
-		if s, _ := pkgDocIndexTable[key]; s != "" {
+		if s, _ := gopkgDocIndexTable[key]; s != "" {
 			pkg.Types[i].Doc = s
 		}
 
 		for j := 0; j < len(pkg.Types[i].Consts); j++ {
 			key := mapKey(lang, pkg.ImportPath, pkg.Types[i].Consts[j].Names[0])
-			if s, _ := pkgDocIndexTable[key]; s != "" {
+			if s, _ := gopkgDocIndexTable[key]; s != "" {
 				pkg.Types[i].Consts[j].Doc = s
 			}
 		}
 		for j := 0; j < len(pkg.Types[i].Vars); j++ {
 			key := mapKey(lang, pkg.ImportPath, pkg.Types[i].Vars[j].Names[0])
-			if s, _ := pkgDocIndexTable[key]; s != "" {
+			if s, _ := gopkgDocIndexTable[key]; s != "" {
 				pkg.Types[i].Vars[j].Doc = s
 			}
 		}
 		for j := 0; j < len(pkg.Types[i].Funcs); j++ {
 			key := mapKey(lang, pkg.ImportPath, pkg.Types[i].Funcs[j].Name)
-			if s, _ := pkgDocIndexTable[key]; s != "" {
+			if s, _ := gopkgDocIndexTable[key]; s != "" {
 				pkg.Types[i].Funcs[j].Doc = s
 			}
 		}
 		for j := 0; j < len(pkg.Types[i].Methods); j++ {
 			id := methodId(pkg.Types[i].Name, pkg.Types[i].Methods[j].Name)
 			key := mapKey(lang, pkg.ImportPath, id)
-			if s, _ := pkgDocIndexTable[key]; s != "" {
+			if s, _ := gopkgDocIndexTable[key]; s != "" {
 				pkg.Types[i].Methods[j].Doc = s
 			}
 		}
 	}
 	for i := 0; i < len(pkg.Vars); i++ {
 		key := mapKey(lang, pkg.ImportPath, pkg.Vars[i].Names[0])
-		if s, _ := pkgDocIndexTable[key]; s != "" {
+		if s, _ := gopkgDocIndexTable[key]; s != "" {
 			pkg.Vars[i].Doc = s
 		}
 	}
 	for i := 0; i < len(pkg.Funcs); i++ {
 		key := mapKey(lang, pkg.ImportPath, pkg.Funcs[i].Name)
-		if s, _ := pkgDocIndexTable[key]; s != "" {
+		if s, _ := gopkgDocIndexTable[key]; s != "" {
 			pkg.Funcs[i].Doc = s
 		}
 	}

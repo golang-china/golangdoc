@@ -7,11 +7,8 @@
 package main
 
 const (
-	// .zip filename
-	flagZipFilename = "goroot.zip"
-
 	// goroot directory in .zip file
-	flagZipGoroot = "goroot"
+	flagZipGoroot = "goroot.zip"
 
 	// glob pattern describing search index files
 	// (if empty, the index is built at run-time)

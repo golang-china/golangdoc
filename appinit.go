@@ -14,8 +14,6 @@ import (
 	"log"
 	"regexp"
 
-	"golang.org/x/tools/godoc/vfs"
-
 	"github.com/golang-china/golangdoc/godoc"
 	"github.com/golang-china/golangdoc/local"
 )
@@ -24,15 +22,12 @@ func init() {
 	playEnabled = true
 
 	log.Println("initializing godoc ...")
-	log.Printf(".zip file   = %s", flagZipFilename)
 	log.Printf(".zip GOROOT = %s", flagZipGoroot)
 	log.Printf("index files = %s", flagIndexFilenames)
 
 	// Determine file system to use.
-	local.Init(flagZipGoroot, local.Default, flagZipFilename, "", "")
-	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
-	fs.Bind("/lib/godoc", local.StaticFS(*flagLang), "/", vfs.BindReplace)
-	fs.Bind("/doc", local.DocumentFS(*flagLang), "/", vfs.BindReplace)
+	local.Init(flagZipGoroot, "", "")
+	fs = local.RootFS(*flagLang)
 
 	corpus := godoc.NewCorpus(fs)
 	corpus.Verbose = false
@@ -49,7 +44,7 @@ func init() {
 		if lang == "en" || lang == "raw" || lang == "EN" {
 			lang = ""
 		}
-		if pkg := local.Package(lang, importPath); pkg != nil {
+		if pkg := local.Package(lang, importPath, nil); pkg != nil {
 			summary = doc.Synopsis(pkg.Doc)
 		}
 		ok = (summary != "")

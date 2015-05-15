@@ -250,7 +250,7 @@ func ParsePackageInfo(name, lang string) (pkg *PackageInfo, err error) {
 		mode = doc.AllDecls
 	}
 	pdoc := doc.New(past[pkgInfo.Name], pkgInfo.ImportPath, mode)
-	pdocLocal := local.Package(lang, pkgInfo.ImportPath)
+	pdocLocal := local.Package(lang, pkgInfo.ImportPath, nil)
 
 	pkg = &PackageInfo{
 		Lang:      lang,

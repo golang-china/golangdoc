@@ -44,7 +44,6 @@ import (
 	"strings"
 
 	"golang.org/x/tools/godoc/analysis"
-	"golang.org/x/tools/godoc/vfs"
 
 	"github.com/golang-china/golangdoc/godoc"
 	"github.com/golang-china/golangdoc/local"
@@ -56,10 +55,6 @@ const (
 )
 
 var (
-	// file system to serve
-	// (with e.g.: zip -r go.zip $GOROOT -i \*.go -i \*.html -i \*.css -i \*.js -i \*.txt -i \*.c -i \*.h -i \*.s -i \*.png -i \*.jpg -i \*.sh -i favicon.ico)
-	flagZipfile = flag.String("zip", "", "zip file providing the file system to serve; disabled if empty")
-
 	// file-based index
 	flagWriteIndex = flag.Bool("write_index", false, "write index to a file; the file name must be specified with -index_files")
 
@@ -87,7 +82,6 @@ var (
 	// layout control
 	flagTabWidth       = flag.Int("tabwidth", 4, "tab width")
 	flagShowTimestamps = flag.Bool("timestamps", false, "show timestamps with directory listings")
-	flagTemplateDir    = flag.String("templates", "", "directory containing alternate template files")
 	flagShowPlayground = flag.Bool("play", false, "enable playground in web interface")
 	flagShowExamples   = flag.Bool("ex", false, "show examples in command line mode")
 	flagDeclLinks      = flag.Bool("links", true, "link identifiers to their declarations")
@@ -157,17 +151,9 @@ func handleURLFlag() {
 }
 
 func runGodoc() {
-	if *flagLocalRoot == "" {
-		if s := os.Getenv("GODOC_LOCAL_ROOT"); s != "" {
-			*flagLocalRoot = s
-		}
-	}
-
 	// Determine file system to use.
-	local.Init(*flagGoroot, *flagLocalRoot, *flagZipfile, *flagTemplateDir, build.Default.GOPATH)
-	fs.Bind("/", local.RootFS(), "/", vfs.BindReplace)
-	fs.Bind("/lib/godoc", local.StaticFS(*flagLang), "/", vfs.BindReplace)
-	fs.Bind("/doc", local.DocumentFS(*flagLang), "/", vfs.BindReplace)
+	local.Init(*flagGoroot, build.Default.GOPATH, *flagLocalRoot)
+	fs = local.RootFS(*flagLang)
 
 	httpMode := *flagHttpAddr != ""
 
@@ -196,7 +182,7 @@ func runGodoc() {
 		if lang == "en" || lang == "raw" || lang == "EN" {
 			lang = ""
 		}
-		if pkg := local.Package(lang, importPath); pkg != nil {
+		if pkg := local.Package(lang, importPath, nil); pkg != nil {
 			summary = doc.Synopsis(pkg.Doc)
 		}
 		ok = (summary != "")
