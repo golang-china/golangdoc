@@ -116,7 +116,7 @@ func buildRootFS(goroot, gopath, translations string) {
 	// blog
 	if _, err := rootfs.Lstat("/blog"); err != nil {
 		const blogPath = "/src/golang.org/x/blog"
-		if _, err := rootfs.Lstat(blogPath); err != nil {
+		if _, err := rootfs.Lstat(blogPath); err == nil {
 			rootfs.Bind("/blog/static", getNameSpace(rootfs, blogPath), "/static", vfs.BindReplace)
 			rootfs.Bind("/blog/template", getNameSpace(rootfs, blogPath), "/template", vfs.BindReplace)
 			rootfs.Bind("/blog/content", getNameSpace(rootfs, blogPath), "/content", vfs.BindReplace)
@@ -124,7 +124,7 @@ func buildRootFS(goroot, gopath, translations string) {
 	}
 
 	// talks
-	if _, err := rootfs.Lstat("/talks"); err != nil {
+	if _, err := rootfs.Lstat("/talks"); err == nil {
 		const presentPath = "/src/golang.org/x/tools/cmd/present"
 		if _, err := rootfs.Lstat(presentPath); err != nil {
 			rootfs.Bind("/talks/static", getNameSpace(rootfs, presentPath), "/static", vfs.BindReplace)
@@ -139,7 +139,7 @@ func buildRootFS(goroot, gopath, translations string) {
 	// tour
 	if _, err := rootfs.Lstat("/tour"); err != nil {
 		const tourPath = "golang.org/x/tour"
-		if _, err := rootfs.Lstat(tourPath); err != nil {
+		if _, err := rootfs.Lstat(tourPath); err == nil {
 			rootfs.Bind("/tour/static", getNameSpace(rootfs, tourPath), tourPath+"/static", vfs.BindReplace)
 			rootfs.Bind("/tour/template", getNameSpace(rootfs, tourPath), tourPath+"/template", vfs.BindReplace)
 			rootfs.Bind("/tour/content", getNameSpace(rootfs, tourPath), tourPath+"/content", vfs.BindReplace)
