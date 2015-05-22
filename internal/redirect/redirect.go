@@ -89,6 +89,7 @@ var cmdRedirects = map[string]string{
 
 var redirects = map[string]string{
 	"/blog":       "/blog/",
+	"/talks":      "/talks/",
 	"/build":      "http://build.golang.org",
 	"/change":     "https://go.googlesource.com/go",
 	"/cl":         "https://go-review.googlesource.com",
@@ -109,7 +110,6 @@ var redirects = map[string]string{
 	"/doc/mem":  "/ref/mem",
 	"/doc/spec": "/ref/spec",
 
-	"/talks": "http://talks.golang.org",
 	"/tour":  "http://tour.golang.org",
 	"/wiki":  "https://github.com/golang/go/wiki",
 
@@ -133,7 +133,6 @@ var redirects = map[string]string{
 var prefixHelpers = map[string]string{
 	"issue": "https://github.com/golang/go/issues/",
 	"play":  "http://play.golang.org/",
-	"talks": "http://talks.golang.org/",
 	"wiki":  "https://github.com/golang/go/wiki/",
 }
 

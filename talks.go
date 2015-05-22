@@ -29,8 +29,6 @@ var (
 )
 
 func init() {
-	return
-
 	// Initialize talks only when first accessed.
 	http.HandleFunc(talksPath, func(w http.ResponseWriter, r *http.Request) {
 		talksInitOnce.Do(talksInit)
