@@ -9,10 +9,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/httpfs"
@@ -56,18 +56,24 @@ type Server struct {
 	template struct {
 		action, article, dir, slides, doc *template.Template
 	}
+
+	// contentTemplate maps the presentable file extensions to the
+	// template to be executed.
+	contentTemplate map[string]*template.Template
+
 	content http.Handler
 }
 
 // NewServer constructs a new Server using the specified config.
 func NewServer(cfg Config) (*Server, error) {
 	present.PlayEnabled = cfg.PlayEnabled
+	s := &Server{cfg: cfg}
 
 	parse := func(fs vfs.FileSystem, t *template.Template, filenames ...string) (*template.Template, error) {
 		if t == nil {
-			t = template.New(filenames[0]).Funcs(template.FuncMap{"playable": playable})
+			t = template.New(filenames[0]).Funcs(template.FuncMap{"playable": s.playable})
 		} else {
-			t = t.Funcs(template.FuncMap{"playable": playable})
+			t = t.Funcs(template.FuncMap{"playable": s.playable})
 		}
 		for _, name := range filenames {
 			data, err := vfs.ReadFile(fs, filepath.ToSlash(filepath.Join(cfg.TemplatePath, name)))
@@ -81,15 +87,13 @@ func NewServer(cfg Config) (*Server, error) {
 		return t, nil
 	}
 
-	s := &Server{cfg: cfg}
-
 	// Parse templates.
 	var err error
 	s.template.action, err = parse(s.cfg.RootFS, nil, "action.tmpl", "action.tmpl")
 	if err != nil {
 		return nil, err
 	}
-	s.template.article, err = parse(s.cfg.RootFS, nil, "root.tmpl", "article.tmpl")
+	s.template.article, err = parse(s.cfg.RootFS, nil, "article.tmpl", "article.tmpl")
 	if err != nil {
 		return nil, err
 	}
@@ -106,15 +110,19 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 
+	s.contentTemplate = make(map[string]*template.Template)
+	s.contentTemplate[".article"] = s.template.article
+	s.contentTemplate[".slide"] = s.template.slides
+
 	// Set up content file server.
 	s.content = http.StripPrefix(s.cfg.BasePath, http.FileServer(
-		httpfs.New(getNameSpace(s.cfg.RootFS, s.cfg.ContentPath)),
+		httpfs.New(s.getNameSpace(s.cfg.RootFS, s.cfg.ContentPath)),
 	))
 
 	return s, nil
 }
 
-func getNameSpace(fs vfs.FileSystem, ns string) vfs.NameSpace {
+func (s *Server) getNameSpace(fs vfs.FileSystem, ns string) vfs.NameSpace {
 	newns := make(vfs.NameSpace)
 	if ns != "" {
 		newns.Bind("/", fs, ns, vfs.BindReplace)
@@ -127,101 +135,53 @@ func getNameSpace(fs vfs.FileSystem, ns string) vfs.NameSpace {
 // ServeHTTP serves the front, index, and article pages
 // as well as the ATOM and JSON feeds.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// TODO
-}
-
-func playable(c present.Code) bool {
-	return present.PlayEnabled && c.Play
-}
-
-// dirHandler serves a directory listing for the requested path, rooted at basePath.
-func dirHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == "/favicon.ico" {
-		http.Error(w, "not found", 404)
-		return
-	}
-	const base = "."
-	name := filepath.Join(base, r.URL.Path)
-	if isDoc(name) {
-		err := renderDoc(w, name)
+	name := strings.TrimPrefix(r.URL.Path, s.cfg.BasePath)
+	if s.isDoc(name) {
+		err := s.renderDoc(w, name)
 		if err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), 500)
 		}
 		return
 	}
-	if isDir, err := dirList(w, name); err != nil {
+	if isDir, err := s.dirList(w, name); err != nil {
 		log.Println(err)
 		http.Error(w, err.Error(), 500)
 		return
 	} else if isDir {
 		return
 	}
-	http.FileServer(http.Dir(base)).ServeHTTP(w, r)
+
+	s.content.ServeHTTP(w, r)
 }
 
-func isDoc(path string) bool {
-	_, ok := contentTemplate[filepath.Ext(path)]
+func (s *Server) playable(c present.Code) bool {
+	return present.PlayEnabled && c.Play
+}
+
+func (s *Server) isDoc(path string) bool {
+	_, ok := s.contentTemplate[filepath.Ext(path)]
 	return ok
-}
-
-var (
-	// dirListTemplate holds the front page template.
-	dirListTemplate *template.Template
-
-	// contentTemplate maps the presentable file extensions to the
-	// template to be executed.
-	contentTemplate map[string]*template.Template
-)
-
-func initTemplates(base string) error {
-	// Locate the template file.
-	actionTmpl := filepath.Join(base, "templates/action.tmpl")
-
-	contentTemplate = make(map[string]*template.Template)
-
-	for ext, contentTmpl := range map[string]string{
-		".slide":   "slides.tmpl",
-		".article": "article.tmpl",
-	} {
-		contentTmpl = filepath.Join(base, "templates", contentTmpl)
-
-		// Read and parse the input.
-		tmpl := present.Template()
-		tmpl = tmpl.Funcs(template.FuncMap{"playable": playable})
-		if _, err := tmpl.ParseFiles(actionTmpl, contentTmpl); err != nil {
-			return err
-		}
-		contentTemplate[ext] = tmpl
-	}
-
-	var err error
-	dirListTemplate, err = template.ParseFiles(filepath.Join(base, "templates/dir.tmpl"))
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // renderDoc reads the present file, gets its template representation,
 // and executes the template, sending output to w.
-func renderDoc(w io.Writer, docFile string) error {
+func (s *Server) renderDoc(w io.Writer, docFile string) error {
 	// Read the input and build the doc structure.
-	doc, err := parse(docFile, 0)
+	doc, err := s.parse(docFile, 0)
 	if err != nil {
 		return err
 	}
 
 	// Find which template should be executed.
-	tmpl := contentTemplate[filepath.Ext(docFile)]
+	tmpl := s.contentTemplate[filepath.Ext(docFile)]
 
 	// Execute the template.
 	return doc.Render(w, tmpl)
 }
 
-func parse(name string, mode present.ParseMode) (*present.Doc, error) {
-	f, err := os.Open(name)
+func (s *Server) parse(name string, mode present.ParseMode) (*present.Doc, error) {
+	f, err := s.cfg.RootFS.Open(name)
 	if err != nil {
 		return nil, err
 	}
@@ -234,20 +194,20 @@ func parse(name string, mode present.ParseMode) (*present.Doc, error) {
 // presentation title in the listing.
 // If the given path is not a directory, it returns (isDir == false, err == nil)
 // and writes nothing to w.
-func dirList(w io.Writer, name string) (isDir bool, err error) {
-	f, err := os.Open(name)
+func (s *Server) dirList(w io.Writer, name string) (isDir bool, err error) {
+	f, err := s.cfg.RootFS.Open(name)
 	if err != nil {
 		return false, err
 	}
 	defer f.Close()
-	fi, err := f.Stat()
+	fi, err := s.cfg.RootFS.Stat(name)
 	if err != nil {
 		return false, err
 	}
 	if isDir = fi.IsDir(); !isDir {
 		return false, nil
 	}
-	fis, err := f.Readdir(0)
+	fis, err := s.cfg.RootFS.ReadDir(name)
 	if err != nil {
 		return false, err
 	}
@@ -261,12 +221,12 @@ func dirList(w io.Writer, name string) (isDir bool, err error) {
 			Name: fi.Name(),
 			Path: filepath.ToSlash(filepath.Join(name, fi.Name())),
 		}
-		if fi.IsDir() && showDir(e.Name) {
+		if fi.IsDir() && s.showDir(e.Name) {
 			d.Dirs = append(d.Dirs, e)
 			continue
 		}
-		if isDoc(e.Name) {
-			if p, err := parse(e.Path, present.TitlesOnly); err != nil {
+		if s.isDoc(e.Name) {
+			if p, err := s.parse(e.Path, present.TitlesOnly); err != nil {
 				log.Println(err)
 			} else {
 				e.Title = p.Title
@@ -277,7 +237,7 @@ func dirList(w io.Writer, name string) (isDir bool, err error) {
 			case ".slide":
 				d.Slides = append(d.Slides, e)
 			}
-		} else if showFile(e.Name) {
+		} else if s.showFile(e.Name) {
 			d.Other = append(d.Other, e)
 		}
 	}
@@ -288,23 +248,23 @@ func dirList(w io.Writer, name string) (isDir bool, err error) {
 	sort.Sort(d.Slides)
 	sort.Sort(d.Articles)
 	sort.Sort(d.Other)
-	return true, dirListTemplate.Execute(w, d)
+	return true, s.template.dir.Execute(w, d)
 }
 
 // showFile reports whether the given file should be displayed in the list.
-func showFile(n string) bool {
+func (s *Server) showFile(n string) bool {
 	switch filepath.Ext(n) {
 	case ".pdf":
 	case ".html":
 	case ".go":
 	default:
-		return isDoc(n)
+		return s.isDoc(n)
 	}
 	return true
 }
 
 // showDir reports whether the given directory should be displayed in the list.
-func showDir(n string) bool {
+func (s *Server) showDir(n string) bool {
 	if len(n) > 0 && (n[0] == '.' || n[0] == '_') || n == "present" {
 		return false
 	}
