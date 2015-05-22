@@ -16,7 +16,7 @@ import (
 	"golang.org/x/tools/godoc/vfs/httpfs"
 	"golang.org/x/tools/godoc/vfs/mapfs"
 
-	"github.com/golang-china/golangdoc/blog"
+	"github.com/golang-china/golangdoc/internal/blog"
 	"github.com/golang-china/golangdoc/local"
 )
 

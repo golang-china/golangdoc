@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/golang-china/golangdoc/blog"
+	"github.com/golang-china/golangdoc/internal/blog"
 	"github.com/golang-china/golangdoc/internal/redirect"
 	"github.com/golang-china/golangdoc/local"
 )

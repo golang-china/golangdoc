@@ -13,8 +13,8 @@ import (
 	"sync"
 
 	"github.com/golang-china/golangdoc/internal/redirect"
+	"github.com/golang-china/golangdoc/internal/talks"
 	"github.com/golang-china/golangdoc/local"
-	"github.com/golang-china/golangdoc/talks"
 )
 
 const (

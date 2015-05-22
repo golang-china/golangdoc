@@ -45,7 +45,7 @@ import (
 
 	"golang.org/x/tools/godoc/analysis"
 
-	"github.com/golang-china/golangdoc/godoc"
+	"github.com/golang-china/golangdoc/internal/godoc"
 	"github.com/golang-china/golangdoc/local"
 )
 
