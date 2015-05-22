@@ -5,21 +5,15 @@
 package talks
 
 import (
-	"bytes"
-	"encoding/json"
-	"encoding/xml"
-	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
-	"time"
 
-	"golang.org/x/tools/blog/atom"
 	"golang.org/x/tools/godoc/vfs"
 	"golang.org/x/tools/godoc/vfs/httpfs"
 	"golang.org/x/tools/present"
@@ -37,10 +31,6 @@ type Config struct {
 	BasePath string // Base URL path relative to server root (no trailing slash).
 	GodocURL string // The base URL of godoc (for menu bar; no trailing slash).
 	Hostname string // Server host name, used for rendering ATOM feeds.
-
-	HomeArticles int    // Articles to display on the home page.
-	FeedArticles int    // Articles to include in Atom and JSON feeds.
-	FeedTitle    string // The title of the Atom XML feed
 
 	PlayEnabled bool
 }
@@ -64,11 +54,9 @@ type Server struct {
 	docPaths map[string]*Doc // key is path without BasePath.
 	docTags  map[string][]*Doc
 	template struct {
-		home, index, article, doc *template.Template
+		action, article, dir, slides, doc *template.Template
 	}
-	atomFeed []byte // pre-rendered Atom feed
-	jsonFeed []byte // pre-rendered JSON feed
-	content  http.Handler
+	content http.Handler
 }
 
 // NewServer constructs a new Server using the specified config.
@@ -77,9 +65,9 @@ func NewServer(cfg Config) (*Server, error) {
 
 	parse := func(fs vfs.FileSystem, t *template.Template, filenames ...string) (*template.Template, error) {
 		if t == nil {
-			t = template.New(filenames[0]).Funcs(funcMap)
+			t = template.New(filenames[0]).Funcs(template.FuncMap{"playable": playable})
 		} else {
-			t = t.Funcs(funcMap)
+			t = t.Funcs(template.FuncMap{"playable": playable})
 		}
 		for _, name := range filenames {
 			data, err := vfs.ReadFile(fs, filepath.ToSlash(filepath.Join(cfg.TemplatePath, name)))
@@ -97,11 +85,7 @@ func NewServer(cfg Config) (*Server, error) {
 
 	// Parse templates.
 	var err error
-	s.template.home, err = parse(s.cfg.RootFS, nil, "root.tmpl", "home.tmpl")
-	if err != nil {
-		return nil, err
-	}
-	s.template.index, err = parse(s.cfg.RootFS, nil, "root.tmpl", "index.tmpl")
+	s.template.action, err = parse(s.cfg.RootFS, nil, "action.tmpl", "action.tmpl")
 	if err != nil {
 		return nil, err
 	}
@@ -109,23 +93,15 @@ func NewServer(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.template.dir, err = parse(s.cfg.RootFS, nil, "dir.tmpl", "dir.tmpl")
+	if err != nil {
+		return nil, err
+	}
+	s.template.slides, err = parse(s.cfg.RootFS, nil, "slides.tmpl", "slides.tmpl")
+	if err != nil {
+		return nil, err
+	}
 	s.template.doc, err = parse(s.cfg.RootFS, present.Template(), "doc.tmpl")
-	if err != nil {
-		return nil, err
-	}
-
-	// Load content.
-	err = s.loadDocs(s.cfg.ContentPath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.renderAtomFeed()
-	if err != nil {
-		return nil, err
-	}
-
-	err = s.renderJSONFeed()
 	if err != nil {
 		return nil, err
 	}
@@ -148,307 +124,204 @@ func getNameSpace(fs vfs.FileSystem, ns string) vfs.NameSpace {
 	return newns
 }
 
-var funcMap = template.FuncMap{
-	"sectioned": sectioned,
-	"authors":   authors,
-}
-
-// sectioned returns true if the provided Doc contains more than one section.
-// This is used to control whether to display the table of contents and headings.
-func sectioned(d *present.Doc) bool {
-	return len(d.Sections) > 1
-}
-
-// authors returns a comma-separated list of author names.
-func authors(authors []present.Author) string {
-	var b bytes.Buffer
-	last := len(authors) - 1
-	for i, a := range authors {
-		if i > 0 {
-			if i == last {
-				b.WriteString(" and ")
-			} else {
-				b.WriteString(", ")
-			}
-		}
-		b.WriteString(authorName(a))
-	}
-	return b.String()
-}
-
-// authorName returns the first line of the Author text: the author's name.
-func authorName(a present.Author) string {
-	el := a.TextElem()
-	if len(el) == 0 {
-		return ""
-	}
-	text, ok := el[0].(present.Text)
-	if !ok || len(text.Lines) == 0 {
-		return ""
-	}
-	return text.Lines[0]
-}
-
-// loadDocs reads all content from the provided file system root, renders all
-// the articles it finds, adds them to the Server's docs field, computes the
-// denormalized docPaths, docTags, and tags fields, and populates the various
-// helper fields (Next, Previous, Related) for each Doc.
-func (s *Server) loadDocs(root string) error {
-	// Read content into docs field.
-	const ext = ".article"
-	fn := func(fs vfs.FileSystem, p string, info os.FileInfo, err error) error {
-		if filepath.Ext(p) != ext {
-			return nil
-		}
-		f, err := fs.Open(p)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		ctx := &present.Context{
-			ReadFile: func(filename string) ([]byte, error) {
-				return vfs.ReadFile(s.cfg.RootFS, filepath.ToSlash(filename))
-			},
-		}
-		d, err := ctx.Parse(f, p, 0)
-		if err != nil {
-			return err
-		}
-		html := new(bytes.Buffer)
-		err = d.Render(html, s.template.doc)
-		if err != nil {
-			return err
-		}
-		p = p[len(root) : len(p)-len(ext)] // trim root and extension
-		p = filepath.ToSlash(p)
-		s.docs = append(s.docs, &Doc{
-			Doc:       d,
-			Path:      filepath.ToSlash(s.cfg.BasePath + p),
-			Permalink: s.cfg.BaseURL + p,
-			HTML:      template.HTML(html.String()),
-		})
-		return nil
-	}
-	err := Walk(s.cfg.RootFS, root, fn)
-	if err != nil {
-		return err
-	}
-	sort.Sort(docsByTime(s.docs))
-
-	// Pull out doc paths and tags and put in reverse-associating maps.
-	s.docPaths = make(map[string]*Doc)
-	s.docTags = make(map[string][]*Doc)
-	for _, d := range s.docs {
-		s.docPaths[strings.TrimPrefix(d.Path, s.cfg.BasePath)] = d
-		for _, t := range d.Tags {
-			s.docTags[t] = append(s.docTags[t], d)
-		}
-	}
-
-	// Pull out unique sorted list of tags.
-	for t := range s.docTags {
-		s.tags = append(s.tags, t)
-	}
-	sort.Strings(s.tags)
-
-	// Set up presentation-related fields, Newer, Older, and Related.
-	for _, doc := range s.docs {
-		// Newer, Older: docs adjacent to doc
-		for i := range s.docs {
-			if s.docs[i] != doc {
-				continue
-			}
-			if i > 0 {
-				doc.Newer = s.docs[i-1]
-			}
-			if i+1 < len(s.docs) {
-				doc.Older = s.docs[i+1]
-			}
-			break
-		}
-
-		// Related: all docs that share tags with doc.
-		related := make(map[*Doc]bool)
-		for _, t := range doc.Tags {
-			for _, d := range s.docTags[t] {
-				if d != doc {
-					related[d] = true
-				}
-			}
-		}
-		for d := range related {
-			doc.Related = append(doc.Related, d)
-		}
-		sort.Sort(docsByTime(doc.Related))
-	}
-
-	return nil
-}
-
-// renderAtomFeed generates an XML Atom feed and stores it in the Server's
-// atomFeed field.
-func (s *Server) renderAtomFeed() error {
-	var updated time.Time
-	if len(s.docs) > 0 {
-		updated = s.docs[0].Time
-	}
-	feed := atom.Feed{
-		Title:   s.cfg.FeedTitle,
-		ID:      "tag:" + s.cfg.Hostname + ",2013:" + s.cfg.Hostname,
-		Updated: atom.Time(updated),
-		Link: []atom.Link{{
-			Rel:  "self",
-			Href: s.cfg.BaseURL + "/feed.atom",
-		}},
-	}
-	for i, doc := range s.docs {
-		if i >= s.cfg.FeedArticles {
-			break
-		}
-		e := &atom.Entry{
-			Title: doc.Title,
-			ID:    feed.ID + doc.Path,
-			Link: []atom.Link{{
-				Rel:  "alternate",
-				Href: doc.Permalink,
-			}},
-			Published: atom.Time(doc.Time),
-			Updated:   atom.Time(doc.Time),
-			Summary: &atom.Text{
-				Type: "html",
-				Body: summary(doc),
-			},
-			Content: &atom.Text{
-				Type: "html",
-				Body: string(doc.HTML),
-			},
-			Author: &atom.Person{
-				Name: authors(doc.Authors),
-			},
-		}
-		feed.Entry = append(feed.Entry, e)
-	}
-	data, err := xml.Marshal(&feed)
-	if err != nil {
-		return err
-	}
-	s.atomFeed = data
-	return nil
-}
-
-type jsonItem struct {
-	Title   string
-	Link    string
-	Time    time.Time
-	Summary string
-	Content string
-	Author  string
-}
-
-// renderJSONFeed generates a JSON feed and stores it in the Server's jsonFeed
-// field.
-func (s *Server) renderJSONFeed() error {
-	var feed []jsonItem
-	for i, doc := range s.docs {
-		if i >= s.cfg.FeedArticles {
-			break
-		}
-		item := jsonItem{
-			Title:   doc.Title,
-			Link:    doc.Permalink,
-			Time:    doc.Time,
-			Summary: summary(doc),
-			Content: string(doc.HTML),
-			Author:  authors(doc.Authors),
-		}
-		feed = append(feed, item)
-	}
-	data, err := json.Marshal(feed)
-	if err != nil {
-		return err
-	}
-	s.jsonFeed = data
-	return nil
-}
-
-// summary returns the first paragraph of text from the provided Doc.
-func summary(d *Doc) string {
-	if len(d.Sections) == 0 {
-		return ""
-	}
-	for _, elem := range d.Sections[0].Elem {
-		text, ok := elem.(present.Text)
-		if !ok || text.Pre {
-			// skip everything but non-text elements
-			continue
-		}
-		var buf bytes.Buffer
-		for _, s := range text.Lines {
-			buf.WriteString(string(present.Style(s)))
-			buf.WriteByte('\n')
-		}
-		return buf.String()
-	}
-	return ""
-}
-
-// rootData encapsulates data destined for the root template.
-type rootData struct {
-	Doc      *Doc
-	BasePath string
-	GodocURL string
-	Data     interface{}
-}
-
 // ServeHTTP serves the front, index, and article pages
 // as well as the ATOM and JSON feeds.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var (
-		d = rootData{BasePath: s.cfg.BasePath, GodocURL: s.cfg.GodocURL}
-		t *template.Template
-	)
-	switch p := strings.TrimPrefix(r.URL.Path, s.cfg.BasePath); p {
-	case "/":
-		d.Data = s.docs
-		if len(s.docs) > s.cfg.HomeArticles {
-			d.Data = s.docs[:s.cfg.HomeArticles]
-		}
-		t = s.template.home
-	case "/index":
-		d.Data = s.docs
-		t = s.template.index
-	case "/feed.atom", "/feeds/posts/default":
-		w.Header().Set("Content-type", "application/atom+xml; charset=utf-8")
-		w.Write(s.atomFeed)
-		return
-	case "/.json":
-		if p := r.FormValue("jsonp"); validJSONPFunc.MatchString(p) {
-			w.Header().Set("Content-type", "application/javascript; charset=utf-8")
-			fmt.Fprintf(w, "%v(%s)", p, s.jsonFeed)
-			return
-		}
-		w.Header().Set("Content-type", "application/json; charset=utf-8")
-		w.Write(s.jsonFeed)
-		return
-	default:
-		doc, ok := s.docPaths[p]
-		if !ok {
-			// Not a doc; try to just serve static content.
-			s.content.ServeHTTP(w, r)
-			return
-		}
-		d.Doc = doc
-		t = s.template.article
-	}
-	err := t.ExecuteTemplate(w, "root", d)
-	if err != nil {
-		log.Println(err)
-	}
+	// TODO
 }
 
-// docsByTime implements sort.Interface, sorting Docs by their Time field.
-type docsByTime []*Doc
+func playable(c present.Code) bool {
+	return present.PlayEnabled && c.Play
+}
 
-func (s docsByTime) Len() int           { return len(s) }
-func (s docsByTime) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s docsByTime) Less(i, j int) bool { return s[i].Time.After(s[j].Time) }
+// dirHandler serves a directory listing for the requested path, rooted at basePath.
+func dirHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/favicon.ico" {
+		http.Error(w, "not found", 404)
+		return
+	}
+	const base = "."
+	name := filepath.Join(base, r.URL.Path)
+	if isDoc(name) {
+		err := renderDoc(w, name)
+		if err != nil {
+			log.Println(err)
+			http.Error(w, err.Error(), 500)
+		}
+		return
+	}
+	if isDir, err := dirList(w, name); err != nil {
+		log.Println(err)
+		http.Error(w, err.Error(), 500)
+		return
+	} else if isDir {
+		return
+	}
+	http.FileServer(http.Dir(base)).ServeHTTP(w, r)
+}
+
+func isDoc(path string) bool {
+	_, ok := contentTemplate[filepath.Ext(path)]
+	return ok
+}
+
+var (
+	// dirListTemplate holds the front page template.
+	dirListTemplate *template.Template
+
+	// contentTemplate maps the presentable file extensions to the
+	// template to be executed.
+	contentTemplate map[string]*template.Template
+)
+
+func initTemplates(base string) error {
+	// Locate the template file.
+	actionTmpl := filepath.Join(base, "templates/action.tmpl")
+
+	contentTemplate = make(map[string]*template.Template)
+
+	for ext, contentTmpl := range map[string]string{
+		".slide":   "slides.tmpl",
+		".article": "article.tmpl",
+	} {
+		contentTmpl = filepath.Join(base, "templates", contentTmpl)
+
+		// Read and parse the input.
+		tmpl := present.Template()
+		tmpl = tmpl.Funcs(template.FuncMap{"playable": playable})
+		if _, err := tmpl.ParseFiles(actionTmpl, contentTmpl); err != nil {
+			return err
+		}
+		contentTemplate[ext] = tmpl
+	}
+
+	var err error
+	dirListTemplate, err = template.ParseFiles(filepath.Join(base, "templates/dir.tmpl"))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// renderDoc reads the present file, gets its template representation,
+// and executes the template, sending output to w.
+func renderDoc(w io.Writer, docFile string) error {
+	// Read the input and build the doc structure.
+	doc, err := parse(docFile, 0)
+	if err != nil {
+		return err
+	}
+
+	// Find which template should be executed.
+	tmpl := contentTemplate[filepath.Ext(docFile)]
+
+	// Execute the template.
+	return doc.Render(w, tmpl)
+}
+
+func parse(name string, mode present.ParseMode) (*present.Doc, error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return present.Parse(f, name, 0)
+}
+
+// dirList scans the given path and writes a directory listing to w.
+// It parses the first part of each .slide file it encounters to display the
+// presentation title in the listing.
+// If the given path is not a directory, it returns (isDir == false, err == nil)
+// and writes nothing to w.
+func dirList(w io.Writer, name string) (isDir bool, err error) {
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	fi, err := f.Stat()
+	if err != nil {
+		return false, err
+	}
+	if isDir = fi.IsDir(); !isDir {
+		return false, nil
+	}
+	fis, err := f.Readdir(0)
+	if err != nil {
+		return false, err
+	}
+	d := &dirListData{Path: name}
+	for _, fi := range fis {
+		// skip the golang.org directory
+		if name == "." && fi.Name() == "golang.org" {
+			continue
+		}
+		e := dirEntry{
+			Name: fi.Name(),
+			Path: filepath.ToSlash(filepath.Join(name, fi.Name())),
+		}
+		if fi.IsDir() && showDir(e.Name) {
+			d.Dirs = append(d.Dirs, e)
+			continue
+		}
+		if isDoc(e.Name) {
+			if p, err := parse(e.Path, present.TitlesOnly); err != nil {
+				log.Println(err)
+			} else {
+				e.Title = p.Title
+			}
+			switch filepath.Ext(e.Path) {
+			case ".article":
+				d.Articles = append(d.Articles, e)
+			case ".slide":
+				d.Slides = append(d.Slides, e)
+			}
+		} else if showFile(e.Name) {
+			d.Other = append(d.Other, e)
+		}
+	}
+	if d.Path == "." {
+		d.Path = ""
+	}
+	sort.Sort(d.Dirs)
+	sort.Sort(d.Slides)
+	sort.Sort(d.Articles)
+	sort.Sort(d.Other)
+	return true, dirListTemplate.Execute(w, d)
+}
+
+// showFile reports whether the given file should be displayed in the list.
+func showFile(n string) bool {
+	switch filepath.Ext(n) {
+	case ".pdf":
+	case ".html":
+	case ".go":
+	default:
+		return isDoc(n)
+	}
+	return true
+}
+
+// showDir reports whether the given directory should be displayed in the list.
+func showDir(n string) bool {
+	if len(n) > 0 && (n[0] == '.' || n[0] == '_') || n == "present" {
+		return false
+	}
+	return true
+}
+
+type dirListData struct {
+	Path                          string
+	Dirs, Slides, Articles, Other dirEntrySlice
+}
+
+type dirEntry struct {
+	Name, Path, Title string
+}
+
+type dirEntrySlice []dirEntry
+
+func (s dirEntrySlice) Len() int           { return len(s) }
+func (s dirEntrySlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s dirEntrySlice) Less(i, j int) bool { return s[i].Name < s[j].Name }

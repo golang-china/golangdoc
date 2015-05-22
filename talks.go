@@ -53,7 +53,6 @@ func talksInit() {
 		BasePath:     strings.TrimSuffix(talksPath, "/"),
 		ContentPath:  "content",
 		TemplatePath: "template",
-		HomeArticles: 5,
 		PlayEnabled:  playEnabled,
 	})
 	if err != nil {

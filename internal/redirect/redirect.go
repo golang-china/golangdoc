@@ -110,8 +110,8 @@ var redirects = map[string]string{
 	"/doc/mem":  "/ref/mem",
 	"/doc/spec": "/ref/spec",
 
-	"/tour":  "http://tour.golang.org",
-	"/wiki":  "https://github.com/golang/go/wiki",
+	"/tour": "http://tour.golang.org",
+	"/wiki": "https://github.com/golang/go/wiki",
 
 	"/doc/articles/c_go_cgo.html":                    "/blog/c-go-cgo",
 	"/doc/articles/concurrency_patterns.html":        "/blog/go-concurrency-patterns-timing-out-and",
