@@ -17,10 +17,10 @@ import (
 	"net/http"
 	"text/template"
 
-	"golang.org/x/tools/godoc/redirect"
 	"golang.org/x/tools/godoc/vfs"
 
 	"github.com/golang-china/golangdoc/godoc"
+	"github.com/golang-china/golangdoc/internal/redirect"
 )
 
 var (
